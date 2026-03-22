@@ -1,0 +1,42 @@
+<<<<<<< HEAD
+# 🌟 核心防泄漏与 Mod 隔离
+config.json
+api/
+modpath.json
+
+# 🗑️ 编辑器与系统临时文件
+tempCodeRunnerFile.py
+.DS_Store
+
+# 🐍 Python 运行时缓存垃圾
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 📦 PyInstaller 打包生成文件
+build/
+dist/
+*.spec
+=======
+# 🌟 核心防泄漏与 Mod 隔离
+config.json
+api/
+petmod/
+modpath.json
+
+# 🗑️ 编辑器与系统临时文件
+tempCodeRunnerFile.py
+.DS_Store
+
+# 🐍 Python 运行时缓存垃圾
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 📦 PyInstaller 打包生成文件
+build/
+dist/
+*.spec
+>>>>>>> 0d74e0d (补充：petmod存放目录)

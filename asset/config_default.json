@@ -1,0 +1,12 @@
+{
+    "API_LAST": "",
+    "PET_LAST": "default_pet",
+    "PEEK_MODE": "fixed",
+    "PEEK_PARAMS": {
+        "interval": 180
+    },
+    "HOTKEY_ENABLED": true,
+    "HOTKEY": "f9",
+    "LAST_POS_X": "",
+    "LAST_POS_Y": ""
+}
