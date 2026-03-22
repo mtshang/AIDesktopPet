@@ -17,31 +17,30 @@
 
 ### 1. 克隆项目
 ```bash
-git clone [https://github.com/mtshang/AIDesktopPet.git](https://github.com/mtshang/AIDesktopPet.git)
+git clone https://github.com/mtshang/AIDesktopPet.git
 cd AIDesktopPet
 ```
+
 ### 2. 安装依赖
 请确保你的环境中已安装 Python 3.10+，然后执行：
-```Bash
+```bash
 pip install PySide6 openai pillow keyboard
 ```
+
 ### 3. 配置与运行
-项目采用模块化配置解耦，首次运行会自动生成 config.json 等配置文件。
-```Bash
+项目采用模块化配置解耦，首次运行会自动生成 `config.json` 等配置文件。
+```bash
 python main.py
 ```
-注意：请在生成的配置或设置界面中填入你的可用大模型 API Key 及节点地址。
+> **注意**：请在生成的配置或设置界面中填入你的可用大模型 API Key 及节点地址。
 
 ## 📂 项目结构说明
-main.py：程序入口与生命周期管理
 
-pet.py：桌面宠物 UI 核心组件与动画逻辑
-
-bottom.py：大模型交互底层逻辑与 QThread 多线程引擎
-
-set.py：系统设置与配置参数的动态加载 UI
-
-asset/：默认美术资产与皮肤配置
+- `main.py`：程序入口与生命周期管理
+- `pet.py`：桌面宠物 UI 核心组件与动画逻辑
+- `bottom.py`：大模型交互底层逻辑与 QThread 多线程引擎
+- `set.py`：系统设置与配置参数的动态加载 UI
+- `asset/`：默认美术资产与皮肤配置
 
 ## 🤝 许可证
-本项目基于 MIT License 开源。欢迎任何人提交 Issue 或 Pull Request 来共同完善这个项目。
+本项目基于 [MIT License](LICENSE) 开源。欢迎任何人提交 Issue 或 Pull Request 来共同完善这个项目。
