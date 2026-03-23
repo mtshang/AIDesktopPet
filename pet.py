@@ -5,7 +5,7 @@ import sys
 import shutil
 import keyboard
 import random
-from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QMenu
+from PySide6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QMenu, QMessageBox
 from PySide6.QtGui import QPixmap, QAction
 from PySide6.QtCore import Qt, QThread, Signal, QTimer, QMutex, QMutexLocker 
 
@@ -102,6 +102,7 @@ class PetWindow(QWidget):
         self.load_initial_config()
         self.initUI()
 
+
         if self.last_pos_x != "" and self.last_pos_y != "":
             self.move(int(self.last_pos_x), int(self.last_pos_y))
         else:
@@ -130,6 +131,7 @@ class PetWindow(QWidget):
         hk_str = self.current_hotkey.title() if self.hotkey_enabled else ""
         initial_text = f"主人好喵！按 {hk_str} 我就会吐槽你哦~" if hk_str else "主人好喵！"
         self.show_bubble(initial_text, duration=15)
+        QTimer.singleShot(500, self.check_first_run)
         
 
     def load_initial_config(self):
@@ -243,6 +245,10 @@ class PetWindow(QWidget):
         menu = QMenu(self)
         menu.setStyleSheet("QMenu { background-color: white; border: 2px solid #ffb6c1; border-radius: 5px; } QMenu::item { padding: 5px 20px; font-family: 'Microsoft YaHei'; font-size: 13px; } QMenu::item:selected { background-color: #ffb6c1; color: white; }")
         
+        tutorial_action = QAction("📖 查看教程", self)
+        tutorial_action.triggered.connect(self.show_tutorial)
+        menu.addAction(tutorial_action)
+
         settings_action = QAction("⚙️ 设置", self)
         settings_action.triggered.connect(self.open_settings)
         menu.addAction(settings_action)
@@ -320,3 +326,73 @@ class PetWindow(QWidget):
         self.loading_timer.stop() 
         self.show_bubble(text)
         self.setup_next_peek()
+
+    def show_tutorial(self):
+        tutorial_text = (
+            "这里是新手教程！使用前必读！！！（可以在右键桌宠的菜单中再次查看教程）\n\n"
+            "    1. 鼠标左键按住桌宠移动鼠标可以改变桌宠位置，鼠标右键可以调出菜单（包括“设置”、“退出”等）。\n\n"
+            "    2. 一定要先在“设置”→“api设置”中新建配置，配置api并保存后才能正常使用！（暂时需要你上网自学如何获取相关大模型api，这里推荐搜索【火山引擎api申请】，后续会更新相关教程）\n\n"
+            "    3. 完成第2步后，按下键盘上的 F9（或你自定义的快捷键），宠物就会观察你的屏幕并吐槽。当然，你也可以在“设置”→“窥屏设置”详细设置（包括“定时窥屏”，修改“窥屏快捷键”等）。"
+        )
+        
+        # 1. 实例化一个完全干净、受控的顶层窗口
+        self.tut_win = QWidget() # 把引用存到 self 里防止被垃圾回收
+        self.tut_win.setWindowTitle("✨ 新手指南")
+        self.tut_win.setWindowFlags(Qt.Window | Qt.WindowStaysOnTopHint | Qt.WindowCloseButtonHint)
+        
+        # 2. 精确设置尺寸（这次绝对听话！）
+        win_width = 800
+        win_height = 300
+        self.tut_win.setFixedSize(win_width, win_height)
+        self.tut_win.setStyleSheet("background-color: #ffffff;") # 暖色背景更护眼
+        
+        # 3. 布局与文字
+        layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # 👉 必须先诞生 label，然后才能设置它！
+        label = QLabel(tutorial_text)
+        label.setWordWrap(True)
+        label.setAlignment(Qt.AlignTop | Qt.AlignLeft) # 👈 让文字顶在最上面
+        
+        label.setStyleSheet("""
+            font-family: 'Microsoft YaHei'; 
+            font-size: 15px; 
+            line-height: 1.6; 
+            color: #333;
+        """)
+        layout.addWidget(label)
+        
+        # 👉 隐形弹簧，把上面的文字死死往上顶
+        layout.addStretch() 
+        
+        self.tut_win.setLayout(layout)
+        
+        # 4. 绝对居中：用刚才我们定死的 win_width 和 win_height 算，绝不出错！
+        screen_geo = QApplication.primaryScreen().availableGeometry()
+        center_x = (screen_geo.width() - win_width) // 2
+        center_y = (screen_geo.height() - win_height) // 2
+        self.tut_win.move(center_x, center_y)
+        
+        # 5. 显示窗口
+        self.tut_win.show()
+
+    def check_first_run(self):
+        is_first = True
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    is_first = config.get("IS_FIRST_RUN", True)
+            except: pass
+
+        if is_first:
+            self.show_tutorial()
+            # 看完后，把标志位改成 False 并存档
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                config["IS_FIRST_RUN"] = False
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, indent=4, ensure_ascii=False)
+            except: pass

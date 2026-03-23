@@ -1,4 +1,5 @@
 {
+    "IS_FIRST_RUN": true,
     "API_LAST": "",
     "PET_LAST": "default_pet",
     "PEEK_MODE": "fixed",
