@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QWidget, QListWidget, QStackedWidget, QHBoxLayout
                                QVBoxLayout, QRadioButton, QButtonGroup, QLabel, 
                                QSpinBox, QGridLayout, QLineEdit, QPushButton, 
                                QMessageBox, QComboBox)
-from PySide6.QtGui import QKeySequence
+from PySide6.QtGui import QKeySequence, QIcon
 from PySide6.QtCore import Qt, Signal
 
 def get_base_path():
@@ -38,6 +38,7 @@ class SettingsWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("桌宠设置中心")
+        self.setWindowIcon(QIcon(os.path.join(current_dir, "asset", "icon.ico")))
         self.resize(1024, 576)
         
         main_layout = QHBoxLayout()
