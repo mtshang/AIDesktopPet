@@ -5,7 +5,7 @@ import os
 import json
 import shutil
 import sys
-from PIL import ImageGrab
+from PIL import Image, ImageGrab
 from openai import OpenAI
 
 # ==========================================
@@ -123,16 +123,49 @@ if need_update_config:
 # ==========================================
 # 2. 核心 AI 处理接口 (直接供子线程调用)
 # ==========================================
+# 将这段代码覆盖你 bottom.py 原有的 get_ai_reply 函数
+
+# 将这段代码覆盖你 bottom.py 原有的 get_ai_reply 函数
+
+# 将这段代码覆盖你 bottom.py 原有的 get_ai_reply 函数
+
 def get_ai_reply():
     print("\n[底层引擎] 正在执行截图与大模型分析...")
     try:
+        # 1. 抓取原生屏幕截图
         screenshot = ImageGrab.grab()
+        
+        # 2. 【终极修改：短边对齐 512 像素等比缩放】
+        # 无论横屏还是竖屏，永远让最短的一边对齐 512，另一边等比例缩放。
+        # 这是多模态大模型切片计费体系下的绝对最优解！
+        
+        orig_width, orig_height = screenshot.size
+        target_min = 512
+        
+        # 判断哪一边更小
+        if orig_width < orig_height:
+            # 竖屏情况：宽度更小，把宽度固定为 512
+            ratio = target_min / orig_width
+            new_width = target_min
+            new_height = int(orig_height * ratio)
+        else:
+            # 横屏情况（最常见）：高度更小，把高度固定为 512
+            ratio = target_min / orig_height
+            new_height = target_min
+            new_width = int(orig_width * ratio)
+            
+        # 执行高质量等比例缩放
+        screenshot = screenshot.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
         buffered = io.BytesIO()
         if screenshot.mode == 'RGBA':
             screenshot = screenshot.convert('RGB')
-        screenshot.save(buffered, format="JPEG", quality=80)
+            
+        # 3. 质量压缩
+        screenshot.save(buffered, format="JPEG", quality=60)
         img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
         
+        # --- 视觉模型请求 (Vision) ---
         v_client = OpenAI(api_key=VISION_API_KEY, base_url=VISION_BASE_URL)
         v_res = v_client.chat.completions.create(
             model=VISION_MODEL,
@@ -142,18 +175,30 @@ def get_ai_reply():
                     {"type": "text", "text": VISION_PROMPT},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}},
                 ],
-            }]
+            }],
+            max_tokens=300 
         )
         description = v_res.choices[0].message.content
-        print(f"[视觉识别完毕] 画面内容：{description}")
+        
+        # 📊 【Vision Token 监控】
+        if v_res.usage:
+            print(f"📊 [Vision Token消耗] 输入: {v_res.usage.prompt_tokens} | 输出: {v_res.usage.completion_tokens} | 总计: {v_res.usage.total_tokens}")
+            
+        print(f"[视觉识别完毕] 画面细节提取 ({len(description)}字)：\n{description}")
 
+        # --- 对话模型请求 (Chat) ---
         c_client = OpenAI(api_key=CHAT_API_KEY, base_url=CHAT_BASE_URL)
         c_res = c_client.chat.completions.create(
             model=CHAT_MODEL,
-            messages=[{"role": "user", "content": CHAT_PROMPT+f"用户屏幕画面是：【{description}】。"}],
-            max_tokens=100
+            messages=[{"role": "user", "content": CHAT_PROMPT + f"\n用户当前的屏幕画面详细描述如下：\n【{description}】\n请基于上述画面细节，进行针对性的吐槽！"}],
+            max_tokens=150
         )
         reply = c_res.choices[0].message.content
+        
+        # 📊 【Chat Token 监控】
+        if c_res.usage:
+            print(f"📊 [Chat Token消耗]   输入: {c_res.usage.prompt_tokens} | 输出: {c_res.usage.completion_tokens} | 总计: {c_res.usage.total_tokens}")
+            
         print(f"[后端处理完毕] 最终吐槽：{reply}")
         
         return {"status": "success", "reply": reply}
