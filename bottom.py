@@ -121,40 +121,60 @@ if need_update_config:
         print(f"⚠️ 自动存档失败: {e}")
 
 # ==========================================
+# 【核心新增】专用于被外部触发的全局变量热更新函数
+# ==========================================
+def update_api_globals():
+    """当设置界面保存 API 后触发此函数，直接修改内存中的全局变量"""
+    global VISION_API_KEY, VISION_BASE_URL, VISION_MODEL
+    global CHAT_API_KEY, CHAT_BASE_URL, CHAT_MODEL
+    global API_LAST
+    
+    try:
+        # 1. 读取最新的主配置确认当前挂载的 API
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                API_LAST = config.get("API_LAST", API_LAST)
+                
+        # 2. 读取具体的 API 引擎数据并覆盖全局变量
+        if API_LAST:
+            api_file = os.path.join(current_dir, "api", f"{API_LAST}.json")
+            if os.path.exists(api_file):
+                with open(api_file, 'r', encoding='utf-8') as f:
+                    api_config = json.load(f)
+                    VISION_API_KEY = api_config.get("VISION_API_KEY", VISION_API_KEY)
+                    VISION_BASE_URL = api_config.get("VISION_BASE_URL", VISION_BASE_URL)
+                    VISION_MODEL = api_config.get("VISION_MODEL", VISION_MODEL)
+                    CHAT_API_KEY = api_config.get("CHAT_API_KEY", CHAT_API_KEY)
+                    CHAT_BASE_URL = api_config.get("CHAT_BASE_URL", CHAT_BASE_URL)
+                    CHAT_MODEL = api_config.get("CHAT_MODEL", CHAT_MODEL)
+        print(f"🔄 [底层引擎] 收到更新信号！全局 API 变量已成功覆写，当前引擎：【{API_LAST}】")
+    except Exception as e:
+        print(f"⚠️ [底层引擎] 热更新全局变量失败: {e}")
+
+# ==========================================
 # 2. 核心 AI 处理接口 (直接供子线程调用)
 # ==========================================
-# 将这段代码覆盖你 bottom.py 原有的 get_ai_reply 函数
-
-# 将这段代码覆盖你 bottom.py 原有的 get_ai_reply 函数
-
-# 将这段代码覆盖你 bottom.py 原有的 get_ai_reply 函数
-
 def get_ai_reply():
     print("\n[底层引擎] 正在执行截图与大模型分析...")
+    # (注意：此处不再有任何读取文件的 I/O 操作，极致纯净)
     try:
         # 1. 抓取原生屏幕截图
         screenshot = ImageGrab.grab()
         
-        # 2. 【终极修改：短边对齐 512 像素等比缩放】
-        # 无论横屏还是竖屏，永远让最短的一边对齐 512，另一边等比例缩放。
-        # 这是多模态大模型切片计费体系下的绝对最优解！
-        
+        # 2. 短边对齐 512 像素等比缩放
         orig_width, orig_height = screenshot.size
         target_min = 512
         
-        # 判断哪一边更小
         if orig_width < orig_height:
-            # 竖屏情况：宽度更小，把宽度固定为 512
             ratio = target_min / orig_width
             new_width = target_min
             new_height = int(orig_height * ratio)
         else:
-            # 横屏情况（最常见）：高度更小，把高度固定为 512
             ratio = target_min / orig_height
             new_height = target_min
             new_width = int(orig_width * ratio)
             
-        # 执行高质量等比例缩放
         screenshot = screenshot.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
         buffered = io.BytesIO()
@@ -180,7 +200,6 @@ def get_ai_reply():
         )
         description = v_res.choices[0].message.content
         
-        # 📊 【Vision Token 监控】
         if v_res.usage:
             print(f"📊 [Vision Token消耗] 输入: {v_res.usage.prompt_tokens} | 输出: {v_res.usage.completion_tokens} | 总计: {v_res.usage.total_tokens}")
             
@@ -195,7 +214,6 @@ def get_ai_reply():
         )
         reply = c_res.choices[0].message.content
         
-        # 📊 【Chat Token 监控】
         if c_res.usage:
             print(f"📊 [Chat Token消耗]   输入: {c_res.usage.prompt_tokens} | 输出: {c_res.usage.completion_tokens} | 总计: {c_res.usage.total_tokens}")
             
@@ -204,5 +222,28 @@ def get_ai_reply():
         return {"status": "success", "reply": reply}
 
     except Exception as e:
-        print(f"[底层报错] {e}")
-        return {"status": "error", "message": str(e)}
+        # ⚠️ 【极其优雅的异常分类拦截器】
+        error_str = str(e).lower()
+        print(f"[底层报错] 详细捕获信息: {error_str}")
+        
+        # 1. 余额不足 / 并发超限 (429)
+        if any(k in error_str for k in ["quota", "insufficient", "balance", "429", "rate limit", "余额", "欠费", "额度"]):
+            msg = "API的Token余额不足了（或者被限制频率了）喵。"
+            
+        # 2. 网络断开 / 代理没开 / 请求超时
+        elif any(k in error_str for k in ["connection", "timeout", "network", "connect", "超时", "host", "proxy"]):
+            msg = "网络似乎断开了，本喵连不上服务器了喵。或者是API的URL填错了喵？"
+            
+        # 3. 密钥填错 / 权限拒绝 (401)
+        elif any(k in error_str for k in ["unauthorized", "invalid", "api_key", "401", "认证失败", "incorrect"]):
+            msg = "API密钥好像填错了，本喵没有权限喵。"
+            
+        # 4. 模型名称填错 / 找不到接入点 (404)
+        elif "404" in error_str or "not found" in error_str:
+            msg = "找不到指定的模型，URL或者Model名字是不是填错了喵？"
+            
+        # 5. 终极兜底：极其罕见的未知报错
+        else:
+            msg = "API调用失败了，请检查设置面板喵。"
+
+        return {"status": "error", "message": msg}

@@ -3,6 +3,8 @@ import os
 import shutil
 import json
 import sys
+# [新增] 引入底层模块，为了触发热更新函数
+import bottom 
 from PySide6.QtWidgets import (QWidget, QListWidget, QStackedWidget, QHBoxLayout, 
                                QVBoxLayout, QRadioButton, QButtonGroup, QLabel, 
                                QSpinBox, QGridLayout, QLineEdit, QPushButton, 
@@ -483,6 +485,10 @@ class SettingsWindow(QWidget):
                     json.dump(config, f, ensure_ascii=False, indent=4)
                     
                 self.active_api_name = target
+                
+                # ⚡️【核心触发】：写入文件后，强行让底层重新装载配置！
+                bottom.update_api_globals()
+                
                 QMessageBox.information(self, "启用成功", f"桌宠大脑已成功切换至引擎：【{target}】喵！")
                 self.on_api_combo_changed(target)
             except Exception as e:
@@ -566,6 +572,11 @@ class SettingsWindow(QWidget):
         try:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(payload, f, ensure_ascii=False, indent=4)
+                
+            # ⚡️【核心触发】：如果你修改的刚好是当前正在使用的 API，强行热更新！
+            if new_name == self.active_api_name:
+                bottom.update_api_globals()
+                
             QMessageBox.information(self, "保存成功", f"API 档案 [{new_name}] 已成功更改并入库喵！")
             self.refresh_api_combo(select_name=new_name)
         except Exception as e:
