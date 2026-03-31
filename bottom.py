@@ -19,6 +19,9 @@ CHAT_BASE_URL = ""
 CHAT_MODEL = ""
 VISION_PROMPT = ""
 CHAT_PROMPT = ""
+# 🌟 新增：动态 Token 默认变量
+VISION_MAX_TOKENS = 300 
+CHAT_MAX_TOKENS = 150
 
 API_LAST = ""
 PET_LAST = "default_pet" 
@@ -104,6 +107,9 @@ if os.path.exists(nature_path):
             active_nature = json.load(file)
             VISION_PROMPT = active_nature.get("vision_prompt", "")
             CHAT_PROMPT = active_nature.get("chat_prompt", "")
+            # 🌟 新增：动态读取 JSON 里的 Token，如果没写，就用最开始声明的默认值兜底
+            VISION_MAX_TOKENS = active_nature.get("vision_max_tokens", 300)
+            CHAT_MAX_TOKENS = active_nature.get("chat_max_tokens", 150)
         print(f"🎭 成功挂载桌宠灵魂与外观：【{PET_LAST}】")
     except Exception as e:
         print(f"⚠️ 解析 {nature_path} 失败: {e}")
@@ -121,7 +127,7 @@ if need_update_config:
         print(f"⚠️ 自动存档失败: {e}")
 
 # ==========================================
-# 【核心新增】专用于被外部触发的全局变量热更新函数
+# 【核心模块】专用于被外部触发的全局变量热更新函数
 # ==========================================
 def update_api_globals():
     """当设置界面保存 API 后触发此函数，直接修改内存中的全局变量"""
@@ -196,7 +202,7 @@ def get_ai_reply():
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}},
                 ],
             }],
-            max_tokens=300 
+            max_tokens=VISION_MAX_TOKENS  # 🌟 动态 Token
         )
         description = v_res.choices[0].message.content
         
@@ -207,10 +213,15 @@ def get_ai_reply():
 
         # --- 对话模型请求 (Chat) ---
         c_client = OpenAI(api_key=CHAT_API_KEY, base_url=CHAT_BASE_URL)
+        
+        # ⚡️ 核心解耦：玩家的人设 Prompt 加上你强制的底层指令
+        system_instruction = f"\n\n[系统强制指令] 用户当前的屏幕画面详细描述如下：\n【{description}】\n请基于上述画面细节，结合你的角色设定，进行回应！"
+        final_prompt = CHAT_PROMPT + system_instruction
+
         c_res = c_client.chat.completions.create(
             model=CHAT_MODEL,
-            messages=[{"role": "user", "content": CHAT_PROMPT + f"\n用户当前的屏幕画面详细描述如下：\n【{description}】\n请基于上述画面细节，进行针对性的吐槽！"}],
-            max_tokens=150
+            messages=[{"role": "user", "content": final_prompt}],
+            max_tokens=CHAT_MAX_TOKENS  # 🌟 动态 Token
         )
         reply = c_res.choices[0].message.content
         

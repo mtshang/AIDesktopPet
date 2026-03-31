@@ -9,5 +9,6 @@
     "HOTKEY_ENABLED": true,
     "HOTKEY": "f9",
     "LAST_POS_X": "",
-    "LAST_POS_Y": ""
+    "LAST_POS_Y": "",
+    "RUN_AS_ADMIN": false
 }
