@@ -4,6 +4,9 @@ import bottom
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, 
                                QPushButton, QGridLayout, QLineEdit, QMessageBox)
 
+# 【新增】引入工业级防损坏写入工具
+from json_write import save_config_atomic
+
 def get_base_path():
     if getattr(sys, 'frozen', False): return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
@@ -194,8 +197,9 @@ class ApiPage(QWidget):
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
                 config["API_LAST"] = target
-                with open(config_path, 'w', encoding='utf-8') as f:
-                    json.dump(config, f, ensure_ascii=False, indent=4)
+                
+                # 【核心优化】原子化写入
+                save_config_atomic(config, config_path)
                     
                 self.active_api_name = target
                 bottom.update_api_globals()
@@ -222,8 +226,8 @@ class ApiPage(QWidget):
         }
         
         try:
-            with open(os.path.join(api_dir, f"{new_name}.json"), 'w', encoding='utf-8') as f:
-                json.dump(empty_payload, f, ensure_ascii=False, indent=4)
+            # 【核心优化】原子化写入
+            save_config_atomic(empty_payload, os.path.join(api_dir, f"{new_name}.json"))
             self.refresh_api_combo(select_name=new_name)
         except Exception as e:
             QMessageBox.warning(self, "错误", f"新建失败：{e}")
@@ -265,7 +269,8 @@ class ApiPage(QWidget):
                 try:
                     with open(config_path, 'r', encoding='utf-8') as f: config = json.load(f)
                     config["API_LAST"] = new_name
-                    with open(config_path, 'w', encoding='utf-8') as f: json.dump(config, f, ensure_ascii=False, indent=4)
+                    # 【核心优化】原子化写入
+                    save_config_atomic(config, config_path)
                 except: pass
         
         file_path = os.path.join(api_dir, f"{new_name}.json")
@@ -275,8 +280,8 @@ class ApiPage(QWidget):
         }
         
         try:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(payload, f, ensure_ascii=False, indent=4)
+            # 【核心优化】原子化写入
+            save_config_atomic(payload, file_path)
                 
             if new_name == self.active_api_name:
                 bottom.update_api_globals()

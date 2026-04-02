@@ -2,7 +2,7 @@
     "IS_FIRST_RUN": true,
     "API_LAST": "",
     "PET_LAST": "default_pet",
-    "PEEK_MODE": "fixed",
+    "PEEK_MODE": "close",
     "PEEK_PARAMS": {
         "interval": 180
     },
@@ -10,5 +10,6 @@
     "HOTKEY": "f9",
     "LAST_POS_X": "",
     "LAST_POS_Y": "",
-    "RUN_AS_ADMIN": false
+    "RUN_AS_ADMIN": false,
+    "AUTO_START": false
 }

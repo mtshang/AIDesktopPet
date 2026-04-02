@@ -24,16 +24,32 @@ class TutorialDialog(QDialog):
         
         layout = QVBoxLayout()
         layout.setContentsMargins(20, 20, 20, 20)
+        
+        # 【核心修改点 1】使用 HTML 富文本格式，加入 <a> 标签超链接
         text = (
-            "这里是新手教程！使用前必读！！！（可以在右键桌宠的菜单中再次查看教程）\n\n"
-            "    1. 鼠标左键按住桌宠移动鼠标可以改变桌宠位置，鼠标右键可以调出菜单（包括“设置”、“退出”等）。\n\n"
-            "    2. 一定要先在“设置”→“api设置”中新建配置，配置api并保存后才能正常使用！（暂时需要你上网自学如何获取相关大模型api，这里推荐搜索【火山引擎api申请】，后续会更新相关教程）\n\n"
-            "    3. 完成第2步后，按下键盘上的 F9（或你自定义的快捷键），桌宠就会观察你的屏幕并吐槽。当然，你也可以在“设置”→“窥屏设置”详细设置。\n\n"
-            "    4. 如果您会在运行全屏程序时使用该桌宠快捷键，请务必勾选【以管理员身份运行】！后续可以在“设置”→“综合设置”中更改是/否选择。"
+            "这里是新手教程！使用前必读！！！（可以在右键桌宠的菜单中再次查看教程）<br><br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;1. 鼠标左键按住桌宠移动鼠标可以改变桌宠位置，鼠标右键可以调出菜单（包括“设置”、“退出”等）。<br><br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;2. 一定要先在“设置”→“api设置”中新建配置，配置api并保存后才能正常使用！（你可以查看作者制作的视频：<br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;   抖音教程：<a href='https://v.douyin.com/G7S80Vm5YH0'>点击前往观看</a><br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;   哔哩哔哩教程：<a href='https://www.bilibili.com/video/BV1KdXkB8EEk'>点击前往观看</a><br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;也上网自学如何获取相关大模型api，这里推荐搜索【火山引擎api申请】。）<br><br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;3. 完成第2步后，按下键盘上的 F9（或你自定义的快捷键），桌宠就会观察你的屏幕并吐槽。当然，你也可以在“设置”→“窥屏设置”详细设置。<br><br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;4. 如果您会在运行全屏程序时使用该桌宠快捷键，请务必勾选【以管理员身份运行】！后续可以在“设置”→“综合设置”中更改是/否选择。<br><br>"
+            "&nbsp;&nbsp;&nbsp;&nbsp;<span style='color: red; font-weight: bold;'>⚠️ 注意：本软件会将屏幕截图发送至您配置的云端模型，请不要在处理机密信息时使用截图功能。</span><br><br>"
         )
+        
         label = QLabel(text)
         label.setWordWrap(True)
-        label.setStyleSheet("font-size: 14px; line-height: 1.6; color: #333;")
+        
+        # 【核心修改点 2】允许 QLabel 打开外部链接
+        label.setOpenExternalLinks(True)
+        
+        # 【核心修改点 3】增加 a 标签（超链接）的 CSS 样式
+        label.setStyleSheet("""
+            QLabel { font-size: 14px; line-height: 1.6; color: #333; }
+            a { color: #FF69B4; text-decoration: none; font-weight: bold; }
+            a:hover { text-decoration: underline; color: #FF1493; }
+        """)
         layout.addWidget(label)
         
         layout.addSpacing(15)

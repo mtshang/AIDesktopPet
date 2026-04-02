@@ -6,6 +6,9 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QRadio
 from PySide6.QtGui import QKeySequence
 from PySide6.QtCore import Qt, Signal
 
+# 【新增】引入工业级防损坏写入工具
+from json_write import save_config_atomic
+
 def get_base_path():
     if getattr(sys, 'frozen', False): return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
@@ -236,8 +239,8 @@ class PeekPage(QWidget):
             config["HOTKEY_ENABLED"] = settings_payload["hotkey_enabled"]
             config["HOTKEY"] = settings_payload["hotkey"]
             
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(config, f, ensure_ascii=False, indent=4)
+            # 【核心优化】原子化写入
+            save_config_atomic(config, config_path)
         except Exception as e:
             QMessageBox.warning(self, "存档失败", f"写入 config.json 失败：{e}")
             return

@@ -12,10 +12,9 @@ from PySide6.QtCore import Qt, QThread, Signal, QTimer
 
 import bottom
 from set import SettingsWindow
-
-# 🌟 引入刚刚拆分出去的两个 UI 组件
 from pet_bubble import BubbleWindow
 from pet_tutorial import TutorialDialog
+from json_write import save_config_atomic
 
 def get_base_path():
     if getattr(sys, 'frozen', False):
@@ -251,8 +250,7 @@ class PetWindow(QWidget):
                     config = json.load(f)
             config["LAST_POS_X"] = self.x()
             config["LAST_POS_Y"] = self.y()
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
+            save_config_atomic(config, config_path)
         except Exception as e:
             print(f"⚠️ 保存位置存档失败: {e}")
             
@@ -293,8 +291,7 @@ class PetWindow(QWidget):
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
             config["HIDE_TASKBAR"] = self.hide_taskbar
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
+            save_config_atomic(config, config_path)
         except Exception as e:
             print(f"保存任务栏状态失败: {e}")
         
@@ -352,6 +349,14 @@ class PetWindow(QWidget):
             self.peek_timer.start(interval * 1000)
 
     def animate_loading_text(self):
+        # 配合气泡的状态机进行校验，如果不在请求中，直接跳出
+        if not self.bubble_win.is_waiting_for_ai:
+            return
+
+        # 🌟【核心修复】：如果 2 秒的防抖警告气泡正在显示，立刻跳出，别让“点点点”动画去抢戏！
+        if self.bubble_win.busy_timer.isActive():
+            return
+
         dots = "." * self.dot_count
         text = f"让我来看看{dots}"
         
@@ -369,16 +374,30 @@ class PetWindow(QWidget):
     def on_f9_pressed_safe(self):
         if self.ignore_hotkey: return
         
-        if not self.ai_thread.isRunning():
-            self.peek_timer.stop() 
-            self.dot_count = 1
-            self.show_bubble("让我来看看.", duration=5)
-            self.animate_loading_text() 
-            self.loading_timer.start(300) 
-            self.ai_thread.start()
+        # 🌟 核心拦截机制：如果子线程（AI 请求）仍在运行，说明桌宠还在忙
+        if self.ai_thread.isRunning():
+            # 【唤起 2 秒防抖气泡拦截】
+            self.bubble_win.show_busy_message()
+            self.update_bubble_position()
+            if not self.bubble_win.isVisible() and self.drag_pos is None:
+                self.bubble_win.show()
+            return
+            
+        # 如果空闲，开启新一轮的大脑请求
+        self.bubble_win.is_waiting_for_ai = True
+        self.peek_timer.stop() 
+        self.dot_count = 1
+        
+        self.show_bubble("让我来看看.", duration=5)
+        self.animate_loading_text() 
+        self.loading_timer.start(300) 
+        self.ai_thread.start()
 
     def update_bubble(self, text):
+        # 大模型返回成功，重置等待状态，停止点点点动画
+        self.bubble_win.is_waiting_for_ai = False
         self.loading_timer.stop() 
+        
         self.show_bubble(text)
         self.setup_next_peek()
 
@@ -420,8 +439,7 @@ class PetWindow(QWidget):
             config["IS_FIRST_RUN"] = False
             config["RUN_AS_ADMIN"] = new_admin_state 
             
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
+            save_config_atomic(config, config_path)
         except Exception as e:
             print(f"保存新手教程状态失败: {e}")
 
