@@ -48,4 +48,5 @@ python main.py
 - `asset/`：预设美术资源与角色皮肤 Mod 目录。
 
 ## 🤝 许可证
-本项目基于 [MIT License](LICENSE) 开源。欢迎提交 Issue 或 Pull Request 贡献代码。
+本项目v0.1.2版本代码基于 [MIT License](LICENSE) 开源。
+v0.1.2以后代码暂不开源上传。
