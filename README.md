@@ -1,5 +1,7 @@
 # 🐾 AIDesktopPet (AI 桌面宠物)
 
+> **⚠️ 注意 (Notice)：** 当前位于 `v0.1.2-opensource` 历史开源分支。此分支代码基于 MIT 协议开源，但不再进行主线功能更新。
+
 ![License](https://img.shields.io/github/license/mtshang/AIDesktopPet)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PySide6](https://img.shields.io/badge/PySide6-GUI-green)
@@ -20,7 +22,7 @@
 
 ### 1. 克隆项目
 ```bash
-git clone https://github.com/mtshang/AIDesktopPet.git
+git clone -b v0.1.2-opensource https://github.com/mtshang/AIDesktopPet.git
 cd AIDesktopPet
 ```
 
@@ -47,6 +49,8 @@ python main.py
 - `version_check.py`：异步版本校验模块，提供云端更新提醒。
 - `asset/`：预设美术资源与角色皮肤 Mod 目录。
 
-## 🤝 许可证
-本项目v0.1.2版本代码基于 [MIT License](LICENSE) 开源。
-v0.1.2以后代码暂不开源上传。
+## 🤝 协议与声明 (License & Disclaimer)
+
+* **代码授权**：本项目 `v0.1.2` 版本的源代码基于 [MIT License](LICENSE) 彻底开源。您可以自由学习、修改和分发。
+* **资产保留**：本项目的专属 Logo 美术资源（即 `asset/icon.ico` 文件）**不适用**于 MIT 协议。该资产的版权归创作者 [@mtshang](https://github.com/mtshang) 所有，保留所有权利 (All Rights Reserved)。
+  * 严禁未经明确授权将本软件 Logo 用于任何形式的商业变现。
