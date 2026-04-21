@@ -20,7 +20,7 @@
 
 ### 1. 克隆项目
 ```bash
-git clone -b v0.1.2-opensource https://github.com/mtshang/AIDesktopPet.git
+git clone -b main https://github.com/mtshang/AIDesktopPet.git
 cd AIDesktopPet
 ```
 
