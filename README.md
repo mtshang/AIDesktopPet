@@ -1,7 +1,5 @@
 # 🐾 AIDesktopPet (AI 桌面宠物)
 
-> **⚠️ 注意 (Notice)：** 当前位于 `v0.1.2-opensource` 历史开源分支。此分支代码基于 MIT 协议开源，但不再进行主线功能更新。
-
 ![License](https://img.shields.io/github/license/mtshang/AIDesktopPet)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PySide6](https://img.shields.io/badge/PySide6-GUI-green)
