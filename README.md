@@ -54,3 +54,5 @@ python main.py
 * **代码授权**：本项目 `v0.1.2` 版本的源代码基于 [MIT License](LICENSE) 彻底开源。您可以自由学习、修改和分发。
 * **资产保留**：本项目的专属 Logo 美术资源（即 `asset/icon.ico` 文件）**不适用**于 MIT 协议。该资产的版权归创作者 [@mtshang](https://github.com/mtshang) 所有，保留所有权利 (All Rights Reserved)。
   * 严禁未经明确授权将本软件 Logo 用于任何形式的商业变现。
+* **第三方素材致谢**：本项目默认内置的角色图层 (`asset/default_pet/character.png`) 为第三方开源/免费素材，版权归原作者所有，遵循其原有协议。来源：[WineChan](https://winechan.itch.io/pink-cat-girl) 。
+
