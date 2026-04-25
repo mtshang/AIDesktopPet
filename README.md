@@ -1,6 +1,6 @@
 # 🐾 AIDesktopPet (AI 桌面宠物) v0.2.0
 
-![License](https://img.shields.io/github/license/mtshang/AIDesktopPet)
+[![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0-blue)](https://github.com/mtshang/AIDesktopPet/blob/main/LICENSE)
 ![Version](https://img.shields.io/badge/Version-0.2.0-orange)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PySide6](https://img.shields.io/badge/PySide6-GUI-green)
@@ -28,7 +28,6 @@ cd AIDesktopPet
 
 ### 2. 安装依赖 
 ```bash
-# 安装核心依赖库
 pip install PySide6 openai pillow keyboard
 ```
 
