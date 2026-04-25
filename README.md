@@ -55,7 +55,7 @@ python main.py
  ┣ 📜 set_api.py          # API 密钥与大模型参数调度
  ┣ 📜 set_general.py      # 常规运行属性配置
  ┣ 📜 set_mod.py          # UGC 角色模组管理器
- ┗ 📜 set_peek.py         # 屏幕感知(窥屏)时间间隔与快捷键设定
+ ┣ 📜 set_peek.py         # 屏幕感知(窥屏)时间间隔与快捷键设定
  ┣ 📂 asset/                # 系统级预设美术资源、默认配置与全局字体 (HarmonyOS Sans)
  ┗ 📂 petmod/               # 用户自定义扩展模组 (Mods) 目录
 ```
@@ -73,5 +73,5 @@ python main.py
   * 采用 [MIT License](https://github.com/mtshang/AIDesktopPet/blob/v0.1.2-opensource/LICENSE) 协议。您可以自由学习、修改和分发该分支下的早期源代码。
 
 **2. 美术资产保留 (All Rights Reserved)**
-* 本项目的专属 Logo 及相关核心美术资源（包括但不限于 `asset/icon.ico` 文件）**独立于上述开源协议**。
+* 本项目的专属 Logo 及相关核心美术资源（包括但不限于 `asset/icon.ico` 文件。但 `asset/default_pet/character.png` 除外。）**独立于上述开源协议**。
 * 该资产的版权完全归属于创作者 [@mtshang](https://github.com/mtshang) 所有，保留所有权利。严禁未经明确授权，擅自使用、修改本软件 Logo 或将其用于任何形式的商业化宣传与变现。
