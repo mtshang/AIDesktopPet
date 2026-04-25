@@ -50,12 +50,12 @@ python main.py
  ┣ 📜 json_write.py         # 防御性编程：原子化文件写入模块，保障数据存储安全
  ┣ 📜 version_check.py      # 异步版本校验模块
  ┣ 📜 pet_tutorial.py       # 新手引导与教程渲染模块
- ┣ 📂 设置中心模块组 (Settings)
- ┃ ┣ 📜 set.py              # 设置面板主容器与导航路由
- ┃ ┣ 📜 set_api.py          # API 密钥与大模型参数调度
- ┃ ┣ 📜 set_general.py      # 常规运行属性配置
- ┃ ┣ 📜 set_mod.py          # UGC 角色模组管理器
- ┃ ┗ 📜 set_peek.py         # 屏幕感知(窥屏)时间间隔与快捷键设定
+ ┣ 设置中心模块组 (Settings)
+ ┣ 📜 set.py              # 设置面板主容器与导航路由
+ ┣ 📜 set_api.py          # API 密钥与大模型参数调度
+ ┣ 📜 set_general.py      # 常规运行属性配置
+ ┣ 📜 set_mod.py          # UGC 角色模组管理器
+ ┗ 📜 set_peek.py         # 屏幕感知(窥屏)时间间隔与快捷键设定
  ┣ 📂 asset/                # 系统级预设美术资源、默认配置与全局字体 (HarmonyOS Sans)
  ┗ 📂 petmod/               # 用户自定义扩展模组 (Mods) 目录
 ```
