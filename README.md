@@ -22,17 +22,12 @@
 
 ### 1. 克隆项目
 ```bash
-git clone -b main [https://github.com/mtshang/AIDesktopPet.git](https://github.com/mtshang/AIDesktopPet.git)
+git clone -b main https://github.com/mtshang/AIDesktopPet.git
 cd AIDesktopPet
 ```
 
-### 2. 隔离环境与安装依赖 (强烈推荐)
-作为标准工程规范，建议使用虚拟环境隔离依赖：
+### 2. 安装依赖 
 ```bash
-# 创建并激活虚拟环境 (Windows)
-python -m venv venv
-.\venv\Scripts\activate
-
 # 安装核心依赖库
 pip install PySide6 openai pillow keyboard
 ```
