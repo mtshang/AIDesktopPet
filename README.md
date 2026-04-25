@@ -73,5 +73,5 @@ python main.py
   * 采用 [MIT License](https://github.com/mtshang/AIDesktopPet/blob/v0.1.2-opensource/LICENSE) 协议。您可以自由学习、修改和分发该分支下的早期源代码。
 
 **2. 美术资产保留 (All Rights Reserved)**
-* 本项目的专属 Logo 及相关核心美术资源（包括但不限于 `asset/icon.ico` 文件。但 `asset/default_pet/character.png` 除外。）**独立于上述开源协议**。
-* 该资产的版权完全归属于创作者 [@mtshang](https://github.com/mtshang) 所有，保留所有权利。严禁未经明确授权，擅自使用、修改本软件 Logo 或将其用于任何形式的商业化宣传与变现。
+* 本项目的专属 Logo 及相关核心原创美术资源（如 `asset/icon.ico`）**独立于上述开源协议**。该资产的版权完全归属于创作者 [@mtshang](https://github.com/mtshang) 所有，保留所有权利。严禁未经明确授权，擅自使用、修改本软件 Logo 或将其用于任何形式的商业化宣传与变现。
+* **第三方素材致谢**：本项目默认内置的角色图层 (`asset/default_pet/character.png`) 为第三方开源/免费素材，版权归原作者所有，遵循其原有协议。来源：[WineChan](https://winechan.itch.io/pink-cat-girl) 。
