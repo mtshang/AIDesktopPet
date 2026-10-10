@@ -6,6 +6,9 @@ import ctypes
 
 # 将 Qt 相关的引入放到最前面
 from PySide6.QtWidgets import QApplication, QMessageBox
+# 🌟 新增：引入本地套接字通信模块，用于单例检测
+from PySide6.QtNetwork import QLocalServer, QLocalSocket
+
 from pet import PetWindow
 from version_check import start_version_check_async
 
@@ -62,13 +65,37 @@ def check_and_elevate():
                 )
 
 # ==========================================
+# 🌟 3. 单例运行核心逻辑
+# ==========================================
+APP_UNIQUE_ID = "AIDesktopPet_Unique_Instance_Socket_2024"
+
+def check_single_instance(app):
+    """检查单例，如果已存在则唤醒旧实例并退出当前实例"""
+    socket = QLocalSocket()
+    socket.connectToServer(APP_UNIQUE_ID)
+    
+    if socket.waitForConnected(500):
+        # 连接成功，说明已经有一个实例在运行了
+        print("🔄 检测到已有实例运行，正在发送唤醒信号...")
+        socket.write(b"WAKE_UP")
+        socket.waitForBytesWritten(500)
+        socket.disconnectFromServer()
+        sys.exit(0) # 核心：第二个实例立刻自杀
+        
+    # 如果连接失败，说明是第一个实例，建立服务器监听
+    server = QLocalServer(app)
+    # 清理可能因为上次异常崩溃残留的死套接字
+    QLocalServer.removeServer(APP_UNIQUE_ID) 
+    server.listen(APP_UNIQUE_ID)
+    return server
+
+# ==========================================
 # 程序的真正入口
 # ==========================================
 if __name__ == '__main__':
     print("🚀 正在启动全息桌宠系统...")
     
     # 🌟 第一步：必须先把 app 实例化！
-    # 这样如果后面提权被拒，我们才能用 QMessageBox 弹出警告框，不然程序会直接崩溃
     app = QApplication(sys.argv)
     
     # ⚡️ 第二步：执行提权拦截与降级检测
@@ -77,9 +104,24 @@ if __name__ == '__main__':
     # 🌟 绝杀连坐 Bug：告诉系统，只有右键点击“退出”才能杀进程
     app.setQuitOnLastWindowClosed(False)
     
-    # 第三步：常规加载桌宠
+    # ⚡️ 第三步：检查单例并建立监听 (必须在提权之后执行)
+    server = check_single_instance(app)
+    
+    # 第四步：常规加载桌宠
     pet = PetWindow()
     pet.show()
+    
+    # ⚡️ 第五步：绑定服务器收到消息时的回调函数
+    def on_new_connection():
+        socket = server.nextPendingConnection()
+        if socket.waitForReadyRead(500):
+            msg = socket.readAll().data().decode('utf-8')
+            if msg == "WAKE_UP":
+                # 收到唤醒信号，调用 pet 的唤醒方法
+                pet.wake_up_from_other_instance()
+        socket.disconnectFromServer()
+
+    server.newConnection.connect(on_new_connection)
     
     print("🔍 正在后台呼叫云端检查新版本...")
     start_version_check_async()

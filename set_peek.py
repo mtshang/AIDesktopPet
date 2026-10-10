@@ -26,13 +26,20 @@ class PeekPage(QWidget):
         self.load_config()
 
     def init_ui(self):
+        # 🌟 字体替换 1：设置全局兜底字体
+        self.setStyleSheet("font-family: 'HarmonyOS Sans SC';")
+
         layout = QVBoxLayout()
         layout.setSpacing(20)
 
         # 1. 窥屏间隔设置
         interval_layout = QVBoxLayout()
         radio_layout = QHBoxLayout()
-        radio_layout.addWidget(QLabel("<b>窥屏间隔：</b>"))
+        # 🌟 字体替换 2：给所有独立渲染的 QLabel 强制绑定字体
+        lbl_interval = QLabel("<b>窥屏间隔：</b>")
+        lbl_interval.setStyleSheet("font-family: 'HarmonyOS Sans SC';")
+        radio_layout.addWidget(lbl_interval)
+        
         self.radio_fixed = QRadioButton("定时")
         self.radio_random = QRadioButton("随机")
         self.radio_close = QRadioButton("关闭窥屏")
@@ -96,7 +103,10 @@ class PeekPage(QWidget):
         # 2. 快捷键设置
         hotkey_layout = QVBoxLayout()
         hk_radio_layout = QHBoxLayout()
-        hk_radio_layout.addWidget(QLabel("<b>窥屏快捷键设置：</b>"))
+        lbl_hk = QLabel("<b>窥屏快捷键设置：</b>")
+        lbl_hk.setStyleSheet("font-family: 'HarmonyOS Sans SC';")
+        hk_radio_layout.addWidget(lbl_hk)
+        
         self.hk_enable = QRadioButton("启用快捷键窥屏")
         self.hk_disable = QRadioButton("关闭")
         self.hk_enable.setChecked(True)
@@ -115,9 +125,12 @@ class PeekPage(QWidget):
         self.hk_display = QLineEdit("f9")
         self.hk_display.setReadOnly(True)
         self.hk_display.setMaximumWidth(150)
-        self.hk_display.setStyleSheet("background-color: #f0f0f0; color: #333;")
+        # 🌟 字体替换 3
+        self.hk_display.setStyleSheet("font-family: 'HarmonyOS Sans SC'; background-color: #f0f0f0; color: #333;")
         
         self.hk_btn = QPushButton("设置快捷键")
+        # 🌟 字体替换 4
+        self.hk_btn.setStyleSheet("font-family: 'HarmonyOS Sans SC';")
         self.hk_btn.clicked.connect(self.start_capturing_key)
         
         hk_inner_layout.addWidget(self.hk_display)
@@ -135,7 +148,8 @@ class PeekPage(QWidget):
         layout.addStretch()
         self.save_btn = QPushButton("💾 保存窥屏设置")
         self.save_btn.setMinimumHeight(40)
-        self.save_btn.setStyleSheet("QPushButton { background-color: #ffb6c1; color: white; font-weight: bold; border-radius: 5px; font-size: 14px; } QPushButton:hover { background-color: #ff91a4; }")
+        # 🌟 字体替换 5
+        self.save_btn.setStyleSheet("QPushButton { font-family: 'HarmonyOS Sans SC'; background-color: #ffb6c1; color: white; font-weight: bold; border-radius: 5px; font-size: 14px; } QPushButton:hover { background-color: #ff91a4; }")
         self.save_btn.clicked.connect(self.validate_and_save)
         layout.addWidget(self.save_btn)
 
@@ -180,7 +194,7 @@ class PeekPage(QWidget):
 
     def start_capturing_key(self):
         self.hk_display.setText("按下要设置的按键...")
-        self.hk_display.setStyleSheet("background-color: #ffb6c1; color: white; font-weight: bold;")
+        self.hk_display.setStyleSheet("font-family: 'HarmonyOS Sans SC'; background-color: #ffb6c1; color: white; font-weight: bold;")
         self.is_capturing_key = True
         self.recording_state_signal.emit(True)
         self.grabKeyboard() 
@@ -190,7 +204,7 @@ class PeekPage(QWidget):
             if event.key() not in (Qt.Key_Shift, Qt.Key_Control, Qt.Key_Alt, Qt.Key_Meta):
                 key_str = QKeySequence(event.keyCombination()).toString().lower()
                 self.hk_display.setText(key_str)
-                self.hk_display.setStyleSheet("background-color: #f0f0f0; color: #333;")
+                self.hk_display.setStyleSheet("font-family: 'HarmonyOS Sans SC'; background-color: #f0f0f0; color: #333;")
                 
                 self.is_capturing_key = False
                 self.releaseKeyboard()

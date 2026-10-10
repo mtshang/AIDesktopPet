@@ -72,14 +72,14 @@ class UpdateDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignCenter)
         
-        # 提示文本
+        # 🌟 字体替换 1：提示文本
         self.label = QLabel(f"发现新版本啦喵：{self.cloud_version}！")
-        self.label.setStyleSheet("font-family: 'Microsoft YaHei'; font-size: 14pt; font-weight: bold; margin: 15px;")
+        self.label.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 14pt; font-weight: bold; margin: 15px;")
         layout.addWidget(self.label, alignment=Qt.AlignCenter)
         
-        # 忽略复选框
+        # 🌟 字体替换 2：忽略复选框
         self.ignore_checkbox = QCheckBox("忽略本次新版本通知")
-        self.ignore_checkbox.setStyleSheet("font-family: 'Microsoft YaHei'; font-size: 11pt;")
+        self.ignore_checkbox.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 11pt;")
         layout.addWidget(self.ignore_checkbox, alignment=Qt.AlignCenter)
         
         # 按钮布局 (水平)
@@ -87,14 +87,14 @@ class UpdateDialog(QDialog):
         btn_layout.setSpacing(20)
         btn_layout.setContentsMargins(0, 10, 0, 0)
         
-        # 前往下载按钮
+        # 🌟 字体替换 3：前往下载按钮
         self.download_btn = QPushButton("去看看")
-        self.download_btn.setStyleSheet("font-family: 'Microsoft YaHei'; font-size: 11pt; padding: 5px 15px;")
+        self.download_btn.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 11pt; padding: 5px 15px;")
         self.download_btn.clicked.connect(self.on_download)
         
-        # 确认按钮
+        # 🌟 字体替换 4：确认按钮
         self.confirm_btn = QPushButton("我知道了")
-        self.confirm_btn.setStyleSheet("font-family: 'Microsoft YaHei'; font-size: 11pt; padding: 5px 15px;")
+        self.confirm_btn.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 11pt; padding: 5px 15px;")
         self.confirm_btn.clicked.connect(self.on_confirm)
         
         btn_layout.addWidget(self.download_btn)

@@ -3,8 +3,7 @@ import os, sys, json
 import bottom 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, 
                                QPushButton, QGridLayout, QLineEdit, QMessageBox)
-
-# 【新增】引入工业级防损坏写入工具
+from PySide6.QtCore import QThread, Signal # 🌟 引入多线程组件
 from json_write import save_config_atomic
 
 def get_base_path():
@@ -14,6 +13,85 @@ def get_base_path():
 current_dir = get_base_path()
 config_path = os.path.join(current_dir, "config.json")
 
+# ==========================================
+# 🌟 修复隐患 1：为 set_api.py 补充后台 I/O 线程
+# ==========================================
+class EnableApiWorker(QThread):
+    finished_signal = Signal(bool, str, str)
+    def __init__(self, config_path, target_api):
+        super().__init__()
+        self.config_path = config_path
+        self.target_api = target_api
+    def run(self):
+        try:
+            config = {}
+            if os.path.exists(self.config_path):
+                with open(self.config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+            config["API_LAST"] = self.target_api
+            save_config_atomic(config, self.config_path)
+            self.finished_signal.emit(True, "", self.target_api)
+        except Exception as e:
+            self.finished_signal.emit(False, str(e), "")
+
+class CreateApiWorker(QThread):
+    finished_signal = Signal(bool, str, str)
+    def __init__(self, api_dir, new_name, payload):
+        super().__init__()
+        self.api_dir = api_dir
+        self.new_name = new_name
+        self.payload = payload
+    def run(self):
+        try:
+            save_config_atomic(self.payload, os.path.join(self.api_dir, f"{self.new_name}.json"))
+            self.finished_signal.emit(True, "", self.new_name)
+        except Exception as e:
+            self.finished_signal.emit(False, str(e), "")
+
+class DeleteApiWorker(QThread):
+    finished_signal = Signal(bool, str)
+    def __init__(self, file_path):
+        super().__init__()
+        self.file_path = file_path
+    def run(self):
+        try:
+            os.remove(self.file_path)
+            self.finished_signal.emit(True, "")
+        except Exception as e:
+            self.finished_signal.emit(False, str(e))
+
+class SaveApiWorker(QThread):
+    finished_signal = Signal(bool, str, str)
+    def __init__(self, old_name, new_name, active_api_name, api_dir, config_path, payload):
+        super().__init__()
+        self.old_name = old_name
+        self.new_name = new_name
+        self.active_api_name = active_api_name
+        self.api_dir = api_dir
+        self.config_path = config_path
+        self.payload = payload
+    def run(self):
+        try:
+            if self.old_name and self.old_name != self.new_name and self.old_name != "(空)":
+                old_path = os.path.join(self.api_dir, f"{self.old_name}.json")
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+                if self.old_name == self.active_api_name:
+                    try:
+                        with open(self.config_path, 'r', encoding='utf-8') as f: config = json.load(f)
+                        config["API_LAST"] = self.new_name
+                        save_config_atomic(config, self.config_path)
+                    except: pass
+            
+            file_path = os.path.join(self.api_dir, f"{self.new_name}.json")
+            save_config_atomic(self.payload, file_path)
+            self.finished_signal.emit(True, "", self.new_name)
+        except Exception as e:
+            self.finished_signal.emit(False, str(e), "")
+
+# ==========================================
+# 主 UI 类
+# ==========================================
 class ApiPage(QWidget):
     def __init__(self):
         super().__init__()
@@ -21,15 +99,18 @@ class ApiPage(QWidget):
         self.init_ui()
 
     def init_ui(self):
+        # 🌟 字体替换 1：全局基础兜底策略
+        self.setStyleSheet("font-family: 'HarmonyOS Sans SC';")
+        
         combo_style = """
-            QComboBox { padding: 5px; border: 1px solid #ccc; border-radius: 3px; min-width: 150px; background-color: white; }
-            QComboBox QAbstractItemView { background-color: white; selection-background-color: #ffb6c1; selection-color: white; outline: none; }
+            QComboBox { font-family: 'HarmonyOS Sans SC'; padding: 5px; border: 1px solid #ccc; border-radius: 3px; min-width: 150px; background-color: white; }
+            QComboBox QAbstractItemView { font-family: 'HarmonyOS Sans SC'; background-color: white; selection-background-color: #ffb6c1; selection-color: white; outline: none; }
         """
         layout = QVBoxLayout()
         layout.setSpacing(15)
 
         title = QLabel("<b>🔌 核心引擎端点配置 (API Settings)</b>")
-        title.setStyleSheet("font-size: 16px; color: #333;")
+        title.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 16px; color: #333;")
         layout.addWidget(title)
         
         api_select_layout = QHBoxLayout()
@@ -42,7 +123,7 @@ class ApiPage(QWidget):
         
         self.enable_api_btn = QPushButton("✅ 启用该配置")
         self.enable_api_btn.setStyleSheet("""
-            QPushButton { background-color: #90ee90; color: #006400; border: 1px solid #3cb371; border-radius: 3px; padding: 5px 10px; font-weight: bold; } 
+            QPushButton { font-family: 'HarmonyOS Sans SC'; background-color: #90ee90; color: #006400; border: 1px solid #3cb371; border-radius: 3px; padding: 5px 10px; font-weight: bold; } 
             QPushButton:hover { background-color: #98fb98; }
             QPushButton:disabled { background-color: #e0e0e0; color: #a0a0a0; border: 1px solid #ccc; }
         """)
@@ -51,7 +132,7 @@ class ApiPage(QWidget):
         
         self.del_api_btn = QPushButton("🗑️ 删除该配置")
         self.del_api_btn.setStyleSheet("""
-            QPushButton { background-color: #ffcccc; border: 1px solid #ff9999; border-radius: 3px; padding: 5px 10px; color: #c00; font-weight: bold; } 
+            QPushButton { font-family: 'HarmonyOS Sans SC'; background-color: #ffcccc; border: 1px solid #ff9999; border-radius: 3px; padding: 5px 10px; color: #c00; font-weight: bold; } 
             QPushButton:hover { background-color: #ff9999; color: white; }
             QPushButton:disabled { background-color: #f5f5f5; color: #ccc; border: 1px solid #ddd; }
         """)
@@ -59,7 +140,7 @@ class ApiPage(QWidget):
         api_select_layout.addWidget(self.del_api_btn)
         
         self.new_api_btn = QPushButton("➕ 新建配置")
-        self.new_api_btn.setStyleSheet("QPushButton { background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 3px; padding: 5px 10px; font-weight: bold; color: #333;} QPushButton:hover { background-color: #e0e0e0; }")
+        self.new_api_btn.setStyleSheet("QPushButton { font-family: 'HarmonyOS Sans SC'; background-color: #f0f0f0; border: 1px solid #ccc; border-radius: 3px; padding: 5px 10px; font-weight: bold; color: #333;} QPushButton:hover { background-color: #e0e0e0; }")
         self.new_api_btn.clicked.connect(self.create_new_api)
         api_select_layout.addWidget(self.new_api_btn)
         
@@ -74,29 +155,29 @@ class ApiPage(QWidget):
 
         grid.addWidget(QLabel("<b>📄 配置文件名:</b>"), 0, 0)
         self.api_filename = QLineEdit()
-        self.api_filename.setStyleSheet("padding: 5px; border: 1px solid #ccc; border-radius: 3px;")
+        self.api_filename.setStyleSheet("font-family: 'HarmonyOS Sans SC'; padding: 5px; border: 1px solid #ccc; border-radius: 3px;")
         grid.addWidget(self.api_filename, 0, 1, 1, 3)
 
         grid.addWidget(QLabel("<b>👁️ 视觉模型 (Vision API)</b> - 用于看屏幕"), 1, 0, 1, 4)
         grid.addWidget(QLabel("Base URL:"), 2, 0)
-        self.v_url = QLineEdit(); self.v_url.setStyleSheet("padding: 3px;")
+        self.v_url = QLineEdit(); self.v_url.setStyleSheet("font-family: 'HarmonyOS Sans SC'; padding: 3px;")
         grid.addWidget(self.v_url, 2, 1, 1, 3)
         grid.addWidget(QLabel("API Key:"), 3, 0)
-        self.v_key = QLineEdit(); self.v_key.setEchoMode(QLineEdit.PasswordEchoOnEdit); self.v_key.setStyleSheet("padding: 3px;")
+        self.v_key = QLineEdit(); self.v_key.setEchoMode(QLineEdit.PasswordEchoOnEdit); self.v_key.setStyleSheet("font-family: 'HarmonyOS Sans SC'; padding: 3px;")
         grid.addWidget(self.v_key, 3, 1, 1, 3)
         grid.addWidget(QLabel("Model:"), 4, 0)
-        self.v_model = QLineEdit(); self.v_model.setStyleSheet("padding: 3px;")
+        self.v_model = QLineEdit(); self.v_model.setStyleSheet("font-family: 'HarmonyOS Sans SC'; padding: 3px;")
         grid.addWidget(self.v_model, 4, 1, 1, 3)
 
         grid.addWidget(QLabel("<b>💬 吐槽模型 (Chat API)</b> - 用于生成对话"), 5, 0, 1, 4)
         grid.addWidget(QLabel("Base URL:"), 6, 0)
-        self.c_url = QLineEdit(); self.c_url.setStyleSheet("padding: 3px;")
+        self.c_url = QLineEdit(); self.c_url.setStyleSheet("font-family: 'HarmonyOS Sans SC'; padding: 3px;")
         grid.addWidget(self.c_url, 6, 1, 1, 3)
         grid.addWidget(QLabel("API Key:"), 7, 0)
-        self.c_key = QLineEdit(); self.c_key.setEchoMode(QLineEdit.PasswordEchoOnEdit); self.c_key.setStyleSheet("padding: 3px;")
+        self.c_key = QLineEdit(); self.c_key.setEchoMode(QLineEdit.PasswordEchoOnEdit); self.c_key.setStyleSheet("font-family: 'HarmonyOS Sans SC'; padding: 3px;")
         grid.addWidget(self.c_key, 7, 1, 1, 3)
         grid.addWidget(QLabel("Model:"), 8, 0)
-        self.c_model = QLineEdit(); self.c_model.setStyleSheet("padding: 3px;")
+        self.c_model = QLineEdit(); self.c_model.setStyleSheet("font-family: 'HarmonyOS Sans SC'; padding: 3px;")
         grid.addWidget(self.c_model, 8, 1, 1, 3)
 
         layout.addLayout(grid)
@@ -104,7 +185,7 @@ class ApiPage(QWidget):
         self.save_api_btn = QPushButton("📦 更改该 API 配置")
         self.save_api_btn.setMinimumHeight(45)
         self.save_api_btn.setStyleSheet("""
-            QPushButton { background-color: #87CEFA; color: white; font-weight: bold; border-radius: 5px; font-size: 15px; } 
+            QPushButton { font-family: 'HarmonyOS Sans SC'; background-color: #87CEFA; color: white; font-weight: bold; border-radius: 5px; font-size: 15px; } 
             QPushButton:hover { background-color: #00BFFF; }
             QPushButton:disabled { background-color: #d3d3d3; color: #a9a9a9; }
         """)
@@ -192,22 +273,24 @@ class ApiPage(QWidget):
         target = self.api_combo.currentText()
         if not target: return
         
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                config["API_LAST"] = target
-                
-                # 【核心优化】原子化写入
-                save_config_atomic(config, config_path)
-                    
-                self.active_api_name = target
-                bottom.update_api_globals()
-                
-                QMessageBox.information(self, "启用成功", f"桌宠大脑已成功切换至引擎：【{target}】喵！")
-                self.on_api_combo_changed(target)
-            except Exception as e:
-                QMessageBox.warning(self, "错误", f"启用失败：{e}")
+        # 🌟 修复隐患 2：直接更新单例内存，极速生效
+        bottom.global_config.set_active_api(target)
+        
+        self.setEnabled(False)
+        self.enable_api_btn.setText("✅ 正在启用...")
+        
+        self.enable_worker = EnableApiWorker(config_path, target)
+        self.enable_worker.finished_signal.connect(self.on_api_enabled)
+        self.enable_worker.finished.connect(self.enable_worker.deleteLater)
+        self.enable_worker.start()
+
+    def on_api_enabled(self, success, error_msg, target):
+        self.setEnabled(True)
+        if success:
+            QMessageBox.information(self, "启用成功", f"桌宠大脑已成功切换至引擎：【{target}】喵！")
+            self.on_api_combo_changed(target)
+        else:
+            QMessageBox.warning(self, "错误", f"启用失败：{error_msg}")
 
     def create_new_api(self):
         api_dir = os.path.join(current_dir, "api")
@@ -225,12 +308,21 @@ class ApiPage(QWidget):
             "CHAT_API_KEY": "", "CHAT_BASE_URL": "", "CHAT_MODEL": ""
         }
         
-        try:
-            # 【核心优化】原子化写入
-            save_config_atomic(empty_payload, os.path.join(api_dir, f"{new_name}.json"))
+        self.setEnabled(False)
+        self.new_api_btn.setText("➕ 正在创建...")
+        
+        self.create_worker = CreateApiWorker(api_dir, new_name, empty_payload)
+        self.create_worker.finished_signal.connect(self.on_api_created)
+        self.create_worker.finished.connect(self.create_worker.deleteLater)
+        self.create_worker.start()
+
+    def on_api_created(self, success, error_msg, new_name):
+        self.setEnabled(True)
+        self.new_api_btn.setText("➕ 新建配置")
+        if success:
             self.refresh_api_combo(select_name=new_name)
-        except Exception as e:
-            QMessageBox.warning(self, "错误", f"新建失败：{e}")
+        else:
+            QMessageBox.warning(self, "错误", f"新建失败：{error_msg}")
 
     def delete_current_api(self):
         target = self.api_combo.currentText()
@@ -242,12 +334,22 @@ class ApiPage(QWidget):
         if reply == QMessageBox.Yes:
             file_path = os.path.join(current_dir, "api", f"{target}.json")
             if os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                    QMessageBox.information(self, "成功", "配置文件已化为齑粉喵！")
-                    self.refresh_api_combo()
-                except Exception as e:
-                    QMessageBox.warning(self, "失败", f"删除失败，可能被占用了喵：{e}")
+                self.setEnabled(False)
+                self.del_api_btn.setText("🗑️ 正在删除...")
+                
+                self.delete_worker = DeleteApiWorker(file_path)
+                self.delete_worker.finished_signal.connect(self.on_api_deleted)
+                self.delete_worker.finished.connect(self.delete_worker.deleteLater)
+                self.delete_worker.start()
+
+    def on_api_deleted(self, success, error_msg):
+        self.setEnabled(True)
+        self.del_api_btn.setText("🗑️ 删除该配置")
+        if success:
+            QMessageBox.information(self, "成功", "配置文件已化为齑粉喵！")
+            self.refresh_api_combo()
+        else:
+            QMessageBox.warning(self, "失败", f"删除失败，可能被占用了喵：{error_msg}")
 
     def save_api_to_file(self):
         old_name = self.api_combo.currentText()
@@ -260,33 +362,28 @@ class ApiPage(QWidget):
             
         api_dir = os.path.join(current_dir, "api")
         
-        if old_name and old_name != new_name and old_name != "(空)":
-            old_path = os.path.join(api_dir, f"{old_name}.json")
-            if os.path.exists(old_path):
-                os.remove(old_path)
-            if old_name == self.active_api_name:
-                self.active_api_name = new_name
-                try:
-                    with open(config_path, 'r', encoding='utf-8') as f: config = json.load(f)
-                    config["API_LAST"] = new_name
-                    # 【核心优化】原子化写入
-                    save_config_atomic(config, config_path)
-                except: pass
-        
-        file_path = os.path.join(api_dir, f"{new_name}.json")
         payload = {
             "VISION_API_KEY": self.v_key.text().strip(), "VISION_BASE_URL": self.v_url.text().strip(), "VISION_MODEL": self.v_model.text().strip(),
             "CHAT_API_KEY": self.c_key.text().strip(), "CHAT_BASE_URL": self.c_url.text().strip(), "CHAT_MODEL": self.c_model.text().strip()
         }
         
-        try:
-            # 【核心优化】原子化写入
-            save_config_atomic(payload, file_path)
-                
+        self.setEnabled(False)
+        self.save_api_btn.setText("📦 正在保存...")
+        
+        self.save_worker = SaveApiWorker(old_name, new_name, self.active_api_name, api_dir, config_path, payload)
+        self.save_worker.finished_signal.connect(self.on_api_saved)
+        self.save_worker.finished.connect(self.save_worker.deleteLater)
+        self.save_worker.start()
+
+    def on_api_saved(self, success, error_msg, new_name):
+        self.setEnabled(True)
+        self.save_api_btn.setText("📦 更改该 API 配置")
+        
+        if success:
             if new_name == self.active_api_name:
-                bottom.update_api_globals()
-                
+                # 🌟 核心修改：如果改的是当前正在用的 API，直接更新内存
+                bottom.global_config.set_active_api(new_name)
             QMessageBox.information(self, "保存成功", f"API 档案 [{new_name}] 已成功更改并入库喵！")
             self.refresh_api_combo(select_name=new_name)
-        except Exception as e:
-            QMessageBox.warning(self, "失败", f"文件写入失败：\n{e}")
+        else:
+            QMessageBox.warning(self, "失败", f"文件写入失败：\n{error_msg}")

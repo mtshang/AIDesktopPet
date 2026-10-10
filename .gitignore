@@ -1,19 +1,51 @@
-# 🌟 核心防泄漏与 Mod 隔离
-config.json
-api/
-modpath.json
+# 本地运行配置（默认模板保留在 asset/ 中）
+/config.json
+/modpath.json
+.env
+.env.*
+!.env.example
+!.env.sample
 
-# 🗑️ 编辑器与系统临时文件
-tempCodeRunnerFile.py
-.DS_Store
+# API 配置与用户安装的 MOD：保留目录占位文件
+/api/*
+!/api/.gitkeep
+/petmod/*
+!/petmod/.gitkeep
 
-# 🐍 Python 运行时缓存垃圾
+# Python 虚拟环境与缓存
+/.venv/
+/venv/
+/env/
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+/htmlcov/
 
-# 📦 PyInstaller 打包生成文件
-build/
-dist/
-*.spec
+# 构建和打包产物（保留 .spec 打包配置）
+/build/
+/dist/
+*.egg-info/
+PyInstaller.txt
+
+# 本机编辑器配置与临时脚本
+/.vscode/
+/.idea/
+/tempCodeRunnerFile.py
+*.swp
+*.swo
+*~
+
+# 日志、原子写入残留及备份
+*.log
+*.tmp
+*.bak
+
+# 操作系统生成文件
+.DS_Store
+Thumbs.db
+Desktop.ini

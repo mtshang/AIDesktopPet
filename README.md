@@ -1,46 +1,76 @@
-# 🐾 AIDesktopPet (AI 桌面宠物)
+# 🐾 AIDesktopPet (AI 桌面宠物) v0.2.0
 
-![License](https://img.shields.io/github/license/mtshang/AIDesktopPet)
+[![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0-blue)](https://github.com/mtshang/AIDesktopPet/blob/main/LICENSE)
+![Version](https://img.shields.io/badge/Version-0.2.0-orange)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![PySide6](https://img.shields.io/badge/PySide6-GUI-green)
 
-一款结合**视觉感知（Vision）** 与**大语言模型（LLM）** 的跨平台桌面端 Agent 助手。采用无边框透明 UI 设计，结合系统级全局监听，实现基于当前屏幕画面的情境感知与智能交互，为你提供极致流畅的桌面 AI 陪伴体验。
+一款结合 **视觉感知（Vision）** 与 **大语言模型（LLM）** 的轻量化桌面端交互助手。通过实时屏幕情境感知与多模态模型驱动，为你提供智能化、个性化的赛博陪伴体验。
 
-## ✨ 核心特性
+## ✨ v0.2.0 核心特性更新
 
-- 👁️ **多模态情境感知**：基于 `PIL.ImageGrab` 截取系统全局画面，利用 Base64 编码打通视觉模型（VLM）的数据链路，实现“屏幕内容识别 - 情境分析 - 智能回复”的交互闭环。
-- ⚡ **异步无阻塞架构**：采用 `QThread` 将耗时的网络 I/O 与大模型推理剥离至子线程，配合 `Signal` 信号槽机制跨线程通信，彻底解决 GUI 程序“假死”问题，保障交互帧率。
-- 🛡️ **优雅降级与自愈机制**：设计了轻量级动态资源路由，物理隔离默认资产与自定义 Mod 目录。在首次克隆无配置环境，或检测到用户自定义路径失效时，自动触发 Fallback 回退机制与兜底生成逻辑。
-- ⌨️ **底层系统接管**：深度调用 PySide6 窗口属性（无边框、鼠标穿透、永远置顶），并集成全局键盘钩子（Hook）实现快捷键无缝唤醒。
+- 🧩 **全新模块化设置中心**：彻底重构单体架构，将设置面板解耦为 `API设置`、`通用设置`、`MOD管理`、`窥屏机制` 四大独立子模块，实现纯异步无阻塞的现代化 UI 交互。
+- 🎨 **独立 MOD 引擎与动态路由**：引入全新的 `petmod/` 目录结构与 `modpath.json` 动态路径解析机制，支持用户零代码热插拔自定义角色皮肤与系统预设（Nature Prompt）。
+- 🔤 **统一视觉排版体验**：全局注入 `HarmonyOS Sans SC` 定制字体，解决跨平台与不同分辨率下的 GUI 字体渲染发虚与排版错乱问题。
+- 👁️ **多模态情境感知**：集成视觉模型（VLM）数据链路，实现对全局屏幕内容的实时识别与深度互动。
+- ⚡ **异步高性能架构**：基于 `QThread` 与 `Signal-Slot` 实现网络 I/O、截图线程与 GUI 渲染的物理隔离，确保在复杂 API 请求期间主界面依然丝滑响应。
+- 🛡️ **工业级稳定性设计**：
+  - **原子化数据持久化**：采用 `json_write.py` 临时文件中转机制，彻底杜绝异常断电或强杀进程导致的配置文件（0KB）损坏。
+  - **系统级事件拦截**：底层调用全局键盘钩子（Hook）捕捉快捷键，解决复杂应用环境下的焦点丢失问题。
 
 ## 🚀 快速开始
 
 ### 1. 克隆项目
 ```bash
-git clone https://github.com/mtshang/AIDesktopPet.git
+git clone -b main https://github.com/mtshang/AIDesktopPet.git
 cd AIDesktopPet
 ```
 
-### 2. 安装依赖
-请确保你的环境中已安装 Python 3.10+，然后执行：
+### 2. 安装依赖 
 ```bash
 pip install PySide6 openai pillow keyboard
 ```
 
 ### 3. 配置与运行
-项目采用模块化配置解耦，首次运行会自动生成 `config.json` 等配置文件。
+项目采用模块化配置解耦，首次运行会自动生成核心运行所需的环境配置文件。
 ```bash
 python main.py
 ```
-> **注意**：请在生成的配置或设置界面中填入你的可用大模型 API Key 及节点地址。
+> **Pro-Tip**：建议以管理员权限运行程序，以获得在全屏游戏环境下的最佳全局快捷键监听兼容性。
 
-## 📂 项目结构说明
+## 📂 核心项目结构说明
 
-- `main.py`：程序入口与生命周期管理
-- `pet.py`：桌面宠物 UI 核心组件与动画逻辑
-- `bottom.py`：大模型交互底层逻辑与 QThread 多线程引擎
-- `set.py`：系统设置与配置参数的动态加载 UI
-- `asset/`：默认美术资产与皮肤配置
+```text
+📦 AIDesktopPet
+ ┣ 📜 main.py               # 程序入口、High DPI 适配及 UAC 权限调度
+ ┣ 📜 pet.py                # 主窗口控制器，负责状态机切换与屏幕停靠逻辑
+ ┣ 📜 bottom.py             # 底层核心引擎，涵盖屏幕捕捉、图像压缩及大模型双路网络交互
+ ┣ 📜 pet_bubble.py         # 交互气泡组件，内置防抖拦截逻辑与动态 UI 状态控制
+ ┣ 📜 json_write.py         # 防御性编程：原子化文件写入模块，保障数据存储安全
+ ┣ 📜 version_check.py      # 异步版本校验模块
+ ┣ 📜 pet_tutorial.py       # 新手引导与教程渲染模块
+ ┣ 设置中心模块组 (Settings)
+ ┣ 📜 set.py              # 设置面板主容器与导航路由
+ ┣ 📜 set_api.py          # API 密钥与大模型参数调度
+ ┣ 📜 set_general.py      # 常规运行属性配置
+ ┣ 📜 set_mod.py          # UGC 角色模组管理器
+ ┣ 📜 set_peek.py         # 屏幕感知(窥屏)时间间隔与快捷键设定
+ ┣ 📂 asset/                # 系统级预设美术资源、默认配置与全局字体 (HarmonyOS Sans)
+ ┗ 📂 petmod/               # 用户自定义扩展模组 (Mods) 目录
+```
 
-## 🤝 许可证
-本项目基于 [MIT License](LICENSE) 开源。欢迎任何人提交 Issue 或 Pull Request 来共同完善这个项目。
+## 🤝 协议与声明 (License & Disclaimer)
+
+**1. 代码授权 (Code License)**
+* **v0.2.0 及后续版本 ([main 分支](https://github.com/mtshang/AIDesktopPet/tree/main))**：
+  * 采用 [PolyForm Noncommercial 1.0.0](https://github.com/mtshang/AIDesktopPet/blob/main/LICENSE) 协议。
+  * **非商业使用**：本项目核心代码仅供个人学习、研究与交流，严禁任何形式的商业化变现。
+  * **商业授权**：如需将本软件用于商业用途，请联系创作者 [@mtshang](https://github.com/mtshang) 获取商业授权。
+  * **UGC 与 Mod 免责声明**：用户通过修改配置文件（如 `.json`）或使用本软件扩展制作的自定义 Mod，其衍生内容的著作权归用户本人所有。若用户在制作 Mod 过程中使用了未经授权的侵权素材（含图像、音频、文本等），纯属用户个人行为，与本软件及核心开发者无关。
+
+* **v0.1.2 历史版本 ([v0.1.2-opensource 分支](https://github.com/mtshang/AIDesktopPet/tree/v0.1.2-opensource))**：
+  * 采用 [MIT License](https://github.com/mtshang/AIDesktopPet/blob/v0.1.2-opensource/LICENSE) 协议。您可以自由学习、修改和分发该分支下的早期源代码。
+
+**2. 美术资产保留 (All Rights Reserved)**
+* 本项目的专属 Logo 及相关核心原创美术资源（如 `asset/icon.ico`）**独立于上述开源协议**。该资产的版权完全归属于创作者 [@mtshang](https://github.com/mtshang) 所有，保留所有权利。严禁未经明确授权，擅自使用、修改本软件 Logo 或将其用于任何形式的商业化宣传与变现。
+* **第三方素材致谢**：本项目默认内置的角色图层 (`asset/default_pet/character.png`) 为第三方开源/免费素材，版权归原作者所有，遵循其原有协议。来源：[WineChan](https://winechan.itch.io/pink-cat-girl) 。

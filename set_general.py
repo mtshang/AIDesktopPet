@@ -40,6 +40,9 @@ class GeneralPage(QWidget):
                 print(f"⚠️ 读取 version.json 失败: {e}")
 
     def init_ui(self):
+        # 🌟 字体替换 1：设置全局兜底字体
+        self.setStyleSheet("font-family: 'HarmonyOS Sans SC';")
+        
         layout = QVBoxLayout()
         layout.setSpacing(20)
 
@@ -47,14 +50,16 @@ class GeneralPage(QWidget):
         # 🌟 软件信息板块
         # ==========================================
         info_title = QLabel("<b>ℹ️ 软件信息 (Software Info)</b>")
-        info_title.setStyleSheet("font-size: 16px; color: #333;")
+        # 🌟 字体替换 2：标题
+        info_title.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 16px; color: #333;")
         layout.addWidget(info_title)
 
         ver_layout = QHBoxLayout()
         
         # 当前版本显示
         cur_ver_label = QLabel(f"<b>当前版本号：</b><span style='color: #666;'>{self.current_ver}</span>")
-        cur_ver_label.setStyleSheet("font-size: 14px;")
+        # 🌟 字体替换 3
+        cur_ver_label.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 14px;")
         
         # 最新版本显示
         if self.current_ver != self.latest_ver and self.latest_ver != "未知":
@@ -65,7 +70,8 @@ class GeneralPage(QWidget):
             latest_text = "&nbsp;&nbsp;<i>(已是最新)</i>"
 
         latest_ver_label = QLabel(f"<b>最新版本号：</b><span style='color: {latest_color};'>{self.latest_ver}</span><span style='color: #888;'>{latest_text}</span>")
-        latest_ver_label.setStyleSheet("font-size: 14px;")
+        # 🌟 字体替换 4
+        latest_ver_label.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 14px;")
 
         ver_layout.addWidget(cur_ver_label)
         ver_layout.addWidget(latest_ver_label)
@@ -81,24 +87,28 @@ class GeneralPage(QWidget):
         # 综合与高级设置板块
         # ==========================================
         title = QLabel("<b>🧰 综合与高级设置 (General Settings)</b>")
-        title.setStyleSheet("font-size: 16px; color: #333;")
+        # 🌟 字体替换 5
+        title.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 16px; color: #333;")
         layout.addWidget(title)
         
         # 管理员权限勾选
         self.admin_cb = QCheckBox("👑 以管理员身份运行 (解决全屏游戏快捷键失效)")
-        self.admin_cb.setStyleSheet("font-size: 14px; color: #ff4500; font-weight: bold; padding-top: 10px;")
+        # 🌟 字体替换 6
+        self.admin_cb.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 14px; color: #ff4500; font-weight: bold; padding-top: 10px;")
         layout.addWidget(self.admin_cb)
 
         # 【新增】开机启动勾选
         self.autostart_cb = QCheckBox(" 开机自动启动 ")
-        self.autostart_cb.setStyleSheet("font-size: 14px; color: #333; padding-bottom: 10px;")
+        # 🌟 字体替换 7
+        self.autostart_cb.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 14px; color: #333; padding-bottom: 10px;")
         layout.addWidget(self.autostart_cb)
 
         layout.addStretch()
 
         self.save_general_btn = QPushButton("💾 保存综合设置")
         self.save_general_btn.setMinimumHeight(40)
-        self.save_general_btn.setStyleSheet("QPushButton { background-color: #ffb6c1; color: white; font-weight: bold; border-radius: 5px; font-size: 14px; } QPushButton:hover { background-color: #ff91a4; }")
+        # 🌟 字体替换 8
+        self.save_general_btn.setStyleSheet("QPushButton { font-family: 'HarmonyOS Sans SC'; background-color: #ffb6c1; color: white; font-weight: bold; border-radius: 5px; font-size: 14px; } QPushButton:hover { background-color: #ff91a4; }")
         self.save_general_btn.clicked.connect(self.save_general_settings)
         layout.addWidget(self.save_general_btn)
 

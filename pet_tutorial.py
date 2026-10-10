@@ -44,9 +44,9 @@ class TutorialDialog(QDialog):
         # 【核心修改点 2】允许 QLabel 打开外部链接
         label.setOpenExternalLinks(True)
         
-        # 【核心修改点 3】增加 a 标签（超链接）的 CSS 样式
+        # 🌟 字体替换补全 1：为标签补上鸿蒙字体
         label.setStyleSheet("""
-            QLabel { font-size: 14px; line-height: 1.6; color: #333; }
+            QLabel { font-family: 'HarmonyOS Sans SC'; font-size: 14px; line-height: 1.6; color: #333; }
             a { color: #FF69B4; text-decoration: none; font-weight: bold; }
             a:hover { text-decoration: underline; color: #FF1493; }
         """)
@@ -59,11 +59,13 @@ class TutorialDialog(QDialog):
         checkbox_layout = QVBoxLayout()
         
         self.hide_cb = QCheckBox("隐藏桌面任务栏图标")
-        self.hide_cb.setStyleSheet("font-size: 13px; color: #555;")
+        # 🌟 字体替换补全 2：为复选框 1 补上鸿蒙字体
+        self.hide_cb.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 13px; color: #555;")
         self.hide_cb.setChecked(current_hide_state) 
         
         self.admin_cb = QCheckBox("👑 以管理员身份运行 (防快捷键失效)")
-        self.admin_cb.setStyleSheet("font-size: 13px; color: #ff4500; font-weight: bold;")
+        # 🌟 字体替换补全 3：为复选框 2 补上鸿蒙字体
+        self.admin_cb.setStyleSheet("font-family: 'HarmonyOS Sans SC'; font-size: 13px; color: #ff4500; font-weight: bold;")
         self.admin_cb.setChecked(current_admin_state)
         
         checkbox_layout.addWidget(self.hide_cb)
@@ -73,8 +75,9 @@ class TutorialDialog(QDialog):
         bottom_layout.addStretch()
         
         self.ok_btn = QPushButton("开始体验！")
+        # 🌟 字体替换补全 4：为确定按钮补上鸿蒙字体
         self.ok_btn.setStyleSheet("""
-            QPushButton { padding: 8px 20px; font-weight: bold; background-color: #FF69B4; color: white; border-radius: 5px; font-size: 14px; }
+            QPushButton { font-family: 'HarmonyOS Sans SC'; padding: 8px 20px; font-weight: bold; background-color: #FF69B4; color: white; border-radius: 5px; font-size: 14px; }
             QPushButton:hover { background-color: #FF1493; }
         """)
         self.ok_btn.clicked.connect(self.accept)

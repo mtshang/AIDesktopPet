@@ -1,0 +1,8 @@
+# Runtime dependencies for Windows / Python 3.10+.
+# PIL is provided by Pillow; standard-library modules need no installation.
+PySide6
+openai>=1.0.0
+Pillow
+keyboard
+requests
+urllib3
