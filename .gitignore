@@ -26,7 +26,8 @@ __pycache__/
 .coverage.*
 /htmlcov/
 
-# 构建和打包产物（保留 .spec 打包配置）
+# 构建、打包产物与本地打包配置
+/AIDesktopPet.spec
 /build/
 /dist/
 *.egg-info/
