@@ -17,6 +17,7 @@ from set import SettingsWindow
 from pet_bubble import BubbleWindow
 from pet_tutorial import TutorialDialog
 from json_write import update_config_atomic
+from window_style import sync_taskbar_visibility
 
 def get_base_path():
     if getattr(sys, 'frozen', False):
@@ -441,6 +442,11 @@ class PetWindow(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
+        # Apply before Windows shows the window, including after a Qt flag change.
+        try:
+            sync_taskbar_visibility(self, self.hide_taskbar)
+        except OSError as error:
+            print(f"设置桌宠任务栏图标失败: {error}")
         self.update_bubble_position()
     
     def moveEvent(self, event):
