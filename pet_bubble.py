@@ -9,6 +9,7 @@ class BubbleWindow(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
 
         self.label = QLabel("", self)
+        self.label.setTextFormat(Qt.PlainText)
         # 🌟 字体替换 1：气泡主文本
         self.label.setStyleSheet("""
             background-color: rgba(255, 255, 255, 230);

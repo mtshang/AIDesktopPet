@@ -86,7 +86,17 @@ def check_single_instance(app):
     server = QLocalServer(app)
     # 清理可能因为上次异常崩溃残留的死套接字
     QLocalServer.removeServer(APP_UNIQUE_ID) 
-    server.listen(APP_UNIQUE_ID)
+    if not server.listen(APP_UNIQUE_ID):
+        # Another process may have won the race between connecting and listening.
+        socket.abort()
+        socket.connectToServer(APP_UNIQUE_ID)
+        if socket.waitForConnected(500):
+            socket.write(b"WAKE_UP")
+            socket.waitForBytesWritten(500)
+            socket.disconnectFromServer()
+            sys.exit(0)
+        QMessageBox.warning(None, "启动失败", "无法创建桌宠单例服务：" + server.errorString())
+        sys.exit(1)
     return server
 
 # ==========================================
@@ -113,13 +123,19 @@ if __name__ == '__main__':
     
     # ⚡️ 第五步：绑定服务器收到消息时的回调函数
     def on_new_connection():
-        socket = server.nextPendingConnection()
-        if socket.waitForReadyRead(500):
-            msg = socket.readAll().data().decode('utf-8')
-            if msg == "WAKE_UP":
-                # 收到唤醒信号，调用 pet 的唤醒方法
-                pet.wake_up_from_other_instance()
-        socket.disconnectFromServer()
+        while server.hasPendingConnections():
+            socket = server.nextPendingConnection()
+            received = bytearray()
+
+            def read_message(socket=socket, received=received):
+                received.extend(bytes(socket.readAll()))
+                if b"WAKE_UP" in received:
+                    pet.wake_up_from_other_instance()
+                    socket.disconnectFromServer()
+
+            socket.readyRead.connect(read_message)
+            socket.disconnected.connect(socket.deleteLater)
+            read_message()
 
     server.newConnection.connect(on_new_connection)
     

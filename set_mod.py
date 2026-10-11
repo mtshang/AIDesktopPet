@@ -1,16 +1,19 @@
+from worker_lifecycle import start_worker, is_shutting_down
 # 文件名：set_mod.py
 import os
 import sys
 import json
 import shutil
 import re
+import uuid
 import copy  # 🌟 引入 copy 模块用于深度拷贝
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                                QPushButton, QLineEdit, QComboBox, QTabWidget, 
                                QScrollArea, QFileDialog, QMessageBox, QFrame, 
                                QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget, QListWidgetItem)
 from PySide6.QtCore import Qt, Signal, QSize, QThread
-from json_write import save_config_atomic
+from json_write import save_config_atomic, update_config_atomic, validate_config_name
+from mod_storage import checked_mod_path, image_relative_path, save_mod
 
 def get_base_path():
     if getattr(sys, 'frozen', False):
@@ -75,57 +78,73 @@ class CopyWorker(QThread):
 
     def run(self):
         try:
+            if os.path.exists(self.dest):
+                if os.path.samefile(self.src, self.dest):
+                    self.finished_signal.emit(True, "", self.dest, self.action_type, self.filename)
+                    return
+                stem, suffix = os.path.splitext(self.dest)
+                # Never overwrite the image still referenced by the saved config.
+                self.dest = f"{stem}_{uuid.uuid4().hex}{suffix}"
+                self.filename = os.path.basename(self.dest)
             shutil.copy2(self.src, self.dest)
             self.finished_signal.emit(True, "", self.dest, self.action_type, self.filename)
-        except Exception as e:
-            self.finished_signal.emit(False, str(e), self.dest, self.action_type, self.filename)
+        except Exception as exc:
+            self.finished_signal.emit(False, str(exc), self.dest, self.action_type, self.filename)
 
 class SaveWorker(QThread):
     finished_signal = Signal(bool, str, str)
 
-    def __init__(self, old_path, new_path, nature_data, base_dir, new_folder_name):
+    def __init__(self, old_path, new_path, nature_data, base_dir, new_folder_name,
+                 config_path=None, pending_removals=()):
         super().__init__()
         self.old_path = old_path
         self.new_path = new_path
-        self.nature_data = nature_data
+        self.nature_data = copy.deepcopy(nature_data)
         self.base_dir = base_dir
         self.new_folder_name = new_folder_name
+        self.config_path = config_path
+        self.pending_removals = set(pending_removals)
 
     def run(self):
-        renamed = False 
         try:
-            if self.old_path != self.new_path:
-                if os.path.exists(self.new_path):
-                    raise FileExistsError(f"目标文件夹 {self.new_path} 内部冲突已存在！")
-                os.rename(self.old_path, self.new_path)
-                renamed = True 
-            
-            nature_file = os.path.join(self.base_dir, self.new_folder_name, "nature.json")
-            save_config_atomic(self.nature_data, nature_file) 
-            
-            self.finished_signal.emit(True, "", self.new_folder_name)
-        except Exception as e:
-            if renamed:
-                try:
-                    os.rename(self.new_path, self.old_path)
-                except Exception as rollback_e:
-                    self.finished_signal.emit(False, f"保存失败且回滚异常: {e} | {rollback_e}", "")
-                    return
-            self.finished_signal.emit(False, str(e), "")
+            warning = save_mod(self.old_path, self.new_path, self.nature_data,
+                               self.base_dir, self.config_path, self.pending_removals)
+            self.finished_signal.emit(True, warning, self.new_folder_name)
+        except Exception as exc:
+            self.finished_signal.emit(False, str(exc), "")
+
 
 class DeleteWorker(QThread):
-    finished_signal = Signal(bool, str)
+    finished_signal = Signal(bool, str, str)
 
-    def __init__(self, target_dir):
+    def __init__(self, target_dir, base_dir, config_path):
         super().__init__()
         self.target_dir = target_dir
+        self.base_dir = base_dir
+        self.config_path = config_path
 
     def run(self):
+        fallback = ""
         try:
-            shutil.rmtree(self.target_dir)
-            self.finished_signal.emit(True, "")
-        except Exception as e:
-            self.finished_signal.emit(False, str(e))
+            target = checked_mod_path(self.base_dir, self.target_dir)
+            folder = os.path.basename(target)
+            if folder == "default_pet":
+                raise ValueError("不能删除默认角色。")
+            def select_default(config):
+                nonlocal fallback
+                if config.get("PET_LAST") == folder:
+                    config["PET_LAST"] = "default_pet"
+                    fallback = "default_pet"
+            # A failed config write must leave the character directory intact.
+            try:
+                update_config_atomic(self.config_path, select_default)
+            except Exception:
+                fallback = ""
+                raise
+            shutil.rmtree(target)
+            self.finished_signal.emit(True, "", fallback)
+        except Exception as exc:
+            self.finished_signal.emit(False, str(exc), fallback)
 
 class ApplyWorker(QThread):
     finished_signal = Signal(bool, str, str)
@@ -137,12 +156,7 @@ class ApplyWorker(QThread):
 
     def run(self):
         try:
-            config = {}
-            if os.path.exists(self.config_path):
-                with open(self.config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-            config["PET_LAST"] = self.current_mod_folder
-            save_config_atomic(config, self.config_path)
+            update_config_atomic(self.config_path, {"PET_LAST": self.current_mod_folder})
             self.finished_signal.emit(True, "", self.current_mod_folder)
         except Exception as e:
             self.finished_signal.emit(False, str(e), "")
@@ -184,6 +198,7 @@ class ModPage(QWidget):
         self.current_mod_folder = ""
         self.current_base_dir = self.asset_dir
         self.current_nature = {}
+        self.pending_image_removals = set()
         self.current_frame_index = 0
         
         self.state_keys = ["standing", "thinking", "draging", "error"]
@@ -646,6 +661,8 @@ class ModPage(QWidget):
         self.load_mod_data()
 
     def load_mod_data(self):
+        # Abandoning unsaved edits must never delete files used by the saved config.
+        self.pending_image_removals.clear()
         self.mod_folder_input.setText(self.current_mod_folder)
         nature_file = os.path.join(self.current_base_dir, self.current_mod_folder, "nature.json")
         
@@ -710,8 +727,9 @@ class ModPage(QWidget):
         idx = self.anim_mode_combo.currentIndex()
         state_key = self.current_state_key
         
-        try: self.standing_img_display.currentIndexChanged.disconnect()
-        except: pass
+        if getattr(self, "_sequence_signal_connected", False):
+            self.standing_img_display.currentIndexChanged.disconnect(self.on_sequence_frame_changed)
+            self._sequence_signal_connected = False
 
         self.standing_img_display.clear()
         file_node = self.current_nature.setdefault("file", {}).setdefault(state_key, {})
@@ -762,12 +780,13 @@ class ModPage(QWidget):
                 self.standing_img_display.addItem("(空)")
                 
             self.standing_img_display.currentIndexChanged.connect(self.on_sequence_frame_changed)
+            self._sequence_signal_connected = True
             
         elif idx == 2: 
             self.lbl_frame_index.hide()
             self.btn_stand_add_replace.show()
             self.btn_stand_add.hide()
-            self.btn_stand_replace.show()
+            self.btn_stand_replace.hide()
             self.lbl_time.show()
             self.time_input.show()
             self.lbl_ms.show()
@@ -839,9 +858,11 @@ class ModPage(QWidget):
         self.copy_worker = CopyWorker(file_path, dest_path, action_type, filename)
         self.copy_worker.finished_signal.connect(self.on_image_copied)
         self.copy_worker.finished.connect(self.copy_worker.deleteLater) 
-        self.copy_worker.start()
+        start_worker(self.copy_worker)
 
     def on_image_copied(self, success, error_msg, dest_path, action_type, filename):
+        if is_shutting_down():
+            return
         self.setEnabled(True) 
         
         if not success:
@@ -898,6 +919,11 @@ class ModPage(QWidget):
             QMessageBox.warning(self, "警告", "文件夹名称包含非法字符！\n不能包含 \\ / : * ? \" < > |")
             return
             
+        try:
+            validate_config_name(new_folder_name)
+        except ValueError as exc:
+            QMessageBox.warning(self, "警告", str(exc))
+            return
         old_path = os.path.join(self.current_base_dir, self.current_mod_folder)
         new_path = old_path
         
@@ -937,12 +963,16 @@ class ModPage(QWidget):
         self.setEnabled(False)
         self.btn_save.setText("💾 正在保存中...")
         
-        self.save_worker = SaveWorker(old_path, new_path, self.current_nature, self.current_base_dir, new_folder_name)
+        self.save_worker = SaveWorker(old_path, new_path, self.current_nature,
+                                      self.current_base_dir, new_folder_name,
+                                      self.config_path, self.pending_image_removals)
         self.save_worker.finished_signal.connect(self.on_mod_saved)
         self.save_worker.finished.connect(self.save_worker.deleteLater)
-        self.save_worker.start()
+        start_worker(self.save_worker)
 
     def on_mod_saved(self, success, error_msg, new_folder_name):
+        if is_shutting_down():
+            return
         self.setEnabled(True)
         self.btn_save.setText("💾 更改该桌宠配置")
         
@@ -951,8 +981,20 @@ class ModPage(QWidget):
             return
             
         self.current_mod_folder = new_folder_name
-        QMessageBox.information(self, "成功", "Mod 配置已保存！\n(部分修改需重新启用该配置或重启桌宠生效)")
+        self.pending_image_removals.clear()
+        # A saved active character must reload before discarded images are needed again.
+        try:
+            with open(self.config_path, encoding="utf-8") as stream:
+                active = json.load(stream).get("PET_LAST")
+            if active == new_folder_name:
+                self.mod_applied_signal.emit(new_folder_name)
+        except (OSError, ValueError) as exc:
+            error_msg = (error_msg + "\n" if error_msg else "") + f"读取启用状态失败：{exc}"
         self.refresh_mod_list(target_folder=self.current_mod_folder)
+        message = "Mod 配置已保存！"
+        if error_msg:
+            message += "\n" + error_msg
+        QMessageBox.information(self, "成功", message)
 
     def delete_current_mod(self):
         if self.current_mod_folder == "default_pet":
@@ -967,15 +1009,19 @@ class ModPage(QWidget):
             self.btn_del.setText("🗑️ 正在删除...")
             
             target_dir = os.path.join(self.current_base_dir, self.current_mod_folder)
-            self.delete_worker = DeleteWorker(target_dir)
+            self.delete_worker = DeleteWorker(target_dir, self.current_base_dir, self.config_path)
             self.delete_worker.finished_signal.connect(self.on_mod_deleted)
             self.delete_worker.finished.connect(self.delete_worker.deleteLater)
-            self.delete_worker.start()
+            start_worker(self.delete_worker)
 
-    def on_mod_deleted(self, success, error_msg):
+    def on_mod_deleted(self, success, error_msg, fallback):
+        if is_shutting_down():
+            return
         self.setEnabled(True)
         self.btn_del.setText("🗑️ 删除该配置")
-        
+        if fallback:
+            self.mod_applied_signal.emit(fallback)
+
         if not success:
             QMessageBox.warning(self, "错误", f"删除失败: {error_msg}")
             return
@@ -1009,9 +1055,12 @@ class ModPage(QWidget):
         self.on_anim_mode_changed()
 
     def _safe_remove(self, path):
-        if os.path.exists(path) and os.path.isfile(path):
-            try: os.remove(path)
-            except: pass
+        root = os.path.join(self.current_base_dir, self.current_mod_folder)
+        if os.path.isfile(path):
+            try:
+                self.pending_image_removals.add(image_relative_path(root, path))
+            except ValueError:
+                pass  # Never queue a path outside this character's images.
 
     def apply_current_mod(self):
         if not self.current_mod_folder: return
@@ -1027,9 +1076,11 @@ class ModPage(QWidget):
         self.apply_worker = ApplyWorker(self.config_path, self.current_mod_folder)
         self.apply_worker.finished_signal.connect(self.on_mod_applied)
         self.apply_worker.finished.connect(self.apply_worker.deleteLater)
-        self.apply_worker.start()
+        start_worker(self.apply_worker)
 
     def on_mod_applied(self, success, error_msg, current_mod_folder):
+        if is_shutting_down():
+            return
         self.setEnabled(True)
         self.btn_apply.setText("🌟 启用该配置")
         
@@ -1061,9 +1112,11 @@ class ModPage(QWidget):
         self.create_worker = CreateWorker(new_path, self.state_keys, default_nature, new_folder)
         self.create_worker.finished_signal.connect(self.on_mod_created)
         self.create_worker.finished.connect(self.create_worker.deleteLater)
-        self.create_worker.start()
+        start_worker(self.create_worker)
 
     def on_mod_created(self, success, error_msg, new_folder):
+        if is_shutting_down():
+            return
         self.setEnabled(True)
         self.btn_new.setText("➕ 新建配置")
         

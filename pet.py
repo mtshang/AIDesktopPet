@@ -1,3 +1,4 @@
+from worker_lifecycle import start_worker, is_shutting_down, worker_registry
 # 文件名：pet.py
 import os
 import json
@@ -15,7 +16,7 @@ import bottom
 from set import SettingsWindow
 from pet_bubble import BubbleWindow
 from pet_tutorial import TutorialDialog
-from json_write import save_config_atomic
+from json_write import update_config_atomic
 
 def get_base_path():
     if getattr(sys, 'frozen', False):
@@ -72,15 +73,7 @@ class ConfigSaveWorker(QThread):
 
     def run(self):
         try:
-            config = {}
-            if os.path.exists(self.config_path):
-                with open(self.config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-            
-            for k, v in self.updates_dict.items():
-                config[k] = v
-                
-            save_config_atomic(config, self.config_path)
+            update_config_atomic(self.config_path, self.updates_dict)
         except Exception as e:
             print(f"后台保存配置失败: {e}")
 
@@ -198,7 +191,7 @@ class PetWindow(QWidget):
             
             self.fallback_worker = ConfigSaveWorker(config_path, {"PET_LAST": "default_pet"})
             self.fallback_worker.finished.connect(self.fallback_worker.deleteLater)
-            self.fallback_worker.start()
+            start_worker(self.fallback_worker)
 
         self.current_image_path = os.path.join(self.pet_folder_path, "character.png")
         self.current_scale = 1.0 
@@ -298,7 +291,7 @@ class PetWindow(QWidget):
             except: wait_time = 100
                 
             self.play_next_frame() 
-            self.anim_timer.start(wait_time) 
+            self.anim_timer.start(max(1, wait_time))
 
     def show_static_image(self, img_path):
         if not os.path.exists(img_path): return
@@ -329,7 +322,7 @@ class PetWindow(QWidget):
                 try: wait_time = int(self.current_anim_times[self.current_frame_index])
                 except: wait_time = 100
                 
-            self.anim_timer.start(wait_time)
+            self.anim_timer.start(max(1, wait_time))
             
             self.current_frame_index += 1
             if self.current_frame_index >= len(self.current_anim_frames):
@@ -418,7 +411,7 @@ class PetWindow(QWidget):
         self.tray_menu.addAction(settings_action)
 
         quit_action = QAction("❌ 退出", self)
-        quit_action.triggered.connect(QApplication.instance().quit)
+        quit_action.triggered.connect(self.request_shutdown)
         self.tray_menu.addAction(quit_action)
 
         self.tray_icon.setContextMenu(self.tray_menu)
@@ -435,7 +428,7 @@ class PetWindow(QWidget):
         self.bubble_win.show()
         
         if duration is None:
-            duration = max(1, int(len(text.encode('gbk')) / 2))
+            duration = max(1, int(len(text.encode('gbk', errors='replace')) / 2))
             
         self.bubble_time_left = duration
         self.bubble_timer.start(1000)
@@ -485,20 +478,31 @@ class PetWindow(QWidget):
             self.bubble_timer.start(1000)
 
     def closeEvent(self, event):
+        event.ignore()
+        self.request_shutdown()
+
+    def request_shutdown(self):
+        if is_shutting_down():
+            return
+        for timer in (self.peek_timer, self.loading_timer, self.anim_timer, self.bubble_timer,
+                      self.bubble_win.busy_timer):
+            timer.stop()
+        keyboard.unhook_all_hotkeys()
+        self.hide()
+        self.bubble_win.hide()
+        self.tray_icon.hide()
+        if self.settings_window is not None:
+            self.settings_window.hide()
+        registry = worker_registry()
+        registry.drained.connect(self.finish_shutdown)
+        registry.begin_shutdown()
+
+    def finish_shutdown(self):
         try:
-            config = {}
-            if os.path.exists(config_path):
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-            config["LAST_POS_X"] = self.x()
-            config["LAST_POS_Y"] = self.y()
-            save_config_atomic(config, config_path)
-        except Exception as e:
-            print(f"⚠️ 保存位置存档失败: {e}")
-            
-        self.bubble_win.close()
+            update_config_atomic(config_path, {"LAST_POS_X": self.x(), "LAST_POS_Y": self.y()})
+        except Exception as exc:
+            print(f"保存位置失败: {exc}")
         QApplication.instance().quit()
-        super().closeEvent(event)
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
@@ -519,7 +523,7 @@ class PetWindow(QWidget):
         menu.addAction(hide_action)
 
         quit_action = QAction("❌ 退出", self)
-        quit_action.triggered.connect(QApplication.instance().quit)
+        quit_action.triggered.connect(self.request_shutdown)
         menu.addAction(quit_action)
 
         menu.exec(event.globalPos())
@@ -529,12 +533,12 @@ class PetWindow(QWidget):
         
         self.taskbar_worker = ConfigSaveWorker(config_path, {"HIDE_TASKBAR": self.hide_taskbar})
         self.taskbar_worker.finished.connect(self.taskbar_worker.deleteLater)
-        self.taskbar_worker.start()
+        start_worker(self.taskbar_worker)
         
-        self.tray_hide_action.setText(f"隐藏桌面任务栏 {'✓' if self.hide_taskbar else '×'}", self)
+        self.tray_hide_action.setText(f"隐藏桌面任务栏 {'✓' if self.hide_taskbar else '×'}")
         
         self.hide()
-        flags = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        flags = Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
         if self.hide_taskbar:
             flags |= Qt.Tool
         self.setWindowFlags(flags)
@@ -617,10 +621,14 @@ class PetWindow(QWidget):
         if self.dot_count > 6: self.dot_count = 1
 
     def on_f9_pressed_safe(self):
+        if is_shutting_down():
+            return
         if self.ignore_hotkey: return
         
         ui_msgs = bottom.global_config.get_ui_msgs()
         
+        if self.bubble_win.is_waiting_for_ai and not (self.screenshot_thread.isRunning() or self.ai_thread.isRunning()):
+            return  # The screenshot is queued but its thread has not started yet.
         if self.screenshot_thread.isRunning() or self.ai_thread.isRunning():
             self.bubble_win.show_busy_message(ui_msgs['peekagain_msg'], ui_msgs['peek_msg'])
             self.update_bubble_position()
@@ -636,9 +644,11 @@ class PetWindow(QWidget):
         self.bubble_win.hide()
         
         QApplication.processEvents()
-        QTimer.singleShot(50, self.screenshot_thread.start)
+        QTimer.singleShot(50, lambda: start_worker(self.screenshot_thread))
 
     def on_screenshot_ready(self, img_b64):
+        if is_shutting_down():
+            return
         self.show()
         self.switch_animation_state("thinking")
         
@@ -648,14 +658,16 @@ class PetWindow(QWidget):
         self.loading_timer.start(300) 
         
         self.ai_thread.img_b64 = img_b64
-        self.ai_thread.start()
+        start_worker(self.ai_thread)
 
     def update_bubble(self, text):
+        if is_shutting_down():
+            return
         self.bubble_win.is_waiting_for_ai = False
         self.loading_timer.stop() 
         
         ui_msgs = bottom.global_config.get_ui_msgs()
-        if ui_msgs['error_head_msg'] in text or "大脑短路" in text:
+        if (ui_msgs['error_head_msg'] and text.startswith(ui_msgs['error_head_msg'])) or "大脑短路" in text:
             self.switch_animation_state("error")
         else:
             self.switch_animation_state("standing")
@@ -664,6 +676,8 @@ class PetWindow(QWidget):
         self.setup_next_peek()
 
     def check_first_run(self):
+        if is_shutting_down():
+            return
         is_first = True
         if os.path.exists(config_path):
             try:
@@ -697,7 +711,7 @@ class PetWindow(QWidget):
             "RUN_AS_ADMIN": new_admin_state
         })
         self.tutorial_worker.finished.connect(self.tutorial_worker.deleteLater)
-        self.tutorial_worker.start()
+        start_worker(self.tutorial_worker)
 
         if needs_restart:
             QMessageBox.information(self, "权限变更", "👑 您勾选了以管理员身份运行！\n\n为了让防快捷键失效的最高权限生效，请手动【退出并重新启动】桌宠喵！")

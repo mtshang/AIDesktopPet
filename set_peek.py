@@ -7,7 +7,7 @@ from PySide6.QtGui import QKeySequence
 from PySide6.QtCore import Qt, Signal
 
 # 【新增】引入工业级防损坏写入工具
-from json_write import save_config_atomic
+from json_write import update_config_atomic
 
 def get_base_path():
     if getattr(sys, 'frozen', False): return os.path.dirname(sys.executable)
@@ -96,9 +96,9 @@ class PeekPage(QWidget):
         interval_layout.addWidget(self.interval_panels)
         layout.addLayout(interval_layout)
 
-        self.radio_fixed.toggled.connect(lambda: self.interval_panels.setCurrentWidget(self.fixed_panel))
-        self.radio_random.toggled.connect(lambda: self.interval_panels.setCurrentWidget(self.random_panel))
-        self.radio_close.toggled.connect(lambda: self.interval_panels.setCurrentWidget(self.empty_panel))
+        self.radio_fixed.toggled.connect(lambda checked: self.interval_panels.setCurrentWidget(self.fixed_panel) if checked else None)
+        self.radio_random.toggled.connect(lambda checked: self.interval_panels.setCurrentWidget(self.random_panel) if checked else None)
+        self.radio_close.toggled.connect(lambda checked: self.interval_panels.setCurrentWidget(self.empty_panel) if checked else None)
 
         # 2. 快捷键设置
         hotkey_layout = QVBoxLayout()
@@ -141,8 +141,7 @@ class PeekPage(QWidget):
         hotkey_layout.addWidget(self.hk_panel)
         layout.addLayout(hotkey_layout)
         
-        self.hk_enable.toggled.connect(self.hk_panel.show)
-        self.hk_disable.toggled.connect(self.hk_panel.hide)
+        self.hk_enable.toggled.connect(self.hk_panel.setVisible)
 
         # 3. 保存按钮
         layout.addStretch()
@@ -193,6 +192,9 @@ class PeekPage(QWidget):
             print(f"⚠️ 设置界面读取存档失败: {e}")
 
     def start_capturing_key(self):
+        if self.is_capturing_key:
+            return
+        self.previous_hotkey = self.hk_display.text()
         self.hk_display.setText("按下要设置的按键...")
         self.hk_display.setStyleSheet("font-family: 'HarmonyOS Sans SC'; background-color: #ffb6c1; color: white; font-weight: bold;")
         self.is_capturing_key = True
@@ -212,7 +214,19 @@ class PeekPage(QWidget):
         else:
             super().keyPressEvent(event)
 
+    def hideEvent(self, event):
+        if self.is_capturing_key:
+            self.is_capturing_key = False
+            self.releaseKeyboard()
+            self.hk_display.setText(self.previous_hotkey)
+            self.hk_display.setStyleSheet("font-family: 'HarmonyOS Sans SC'; background-color: #f0f0f0; color: #333;")
+            self.recording_state_signal.emit(False)
+        super().hideEvent(event)
+
     def validate_and_save(self):
+        if self.is_capturing_key:
+            QMessageBox.warning(self, "设置失败", "请先完成快捷键录制。")
+            return
         settings_payload = {
             'peek_mode': 'close',
             'peek_params': {},
@@ -243,18 +257,12 @@ class PeekPage(QWidget):
             settings_payload['peek_mode'] = 'close'
 
         try:
-            config = {}
-            if os.path.exists(config_path):
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-            
-            config["PEEK_MODE"] = settings_payload["peek_mode"]
-            config["PEEK_PARAMS"] = settings_payload["peek_params"]
-            config["HOTKEY_ENABLED"] = settings_payload["hotkey_enabled"]
-            config["HOTKEY"] = settings_payload["hotkey"]
-            
-            # 【核心优化】原子化写入
-            save_config_atomic(config, config_path)
+            update_config_atomic(config_path, {
+                "PEEK_MODE": settings_payload["peek_mode"],
+                "PEEK_PARAMS": settings_payload["peek_params"],
+                "HOTKEY_ENABLED": settings_payload["hotkey_enabled"],
+                "HOTKEY": settings_payload["hotkey"],
+            })
         except Exception as e:
             QMessageBox.warning(self, "存档失败", f"写入 config.json 失败：{e}")
             return

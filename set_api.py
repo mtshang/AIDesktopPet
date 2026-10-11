@@ -1,10 +1,11 @@
+from worker_lifecycle import start_worker, is_shutting_down
 # 文件名：set_api.py
 import os, sys, json
 import bottom 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, 
                                QPushButton, QGridLayout, QLineEdit, QMessageBox)
 from PySide6.QtCore import QThread, Signal # 🌟 引入多线程组件
-from json_write import save_config_atomic
+from json_write import save_config_atomic, update_config_atomic, validate_config_name
 
 def get_base_path():
     if getattr(sys, 'frozen', False): return os.path.dirname(sys.executable)
@@ -24,12 +25,12 @@ class EnableApiWorker(QThread):
         self.target_api = target_api
     def run(self):
         try:
-            config = {}
-            if os.path.exists(self.config_path):
-                with open(self.config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-            config["API_LAST"] = self.target_api
-            save_config_atomic(config, self.config_path)
+            validate_config_name(self.target_api)
+            api_file = os.path.join(os.path.dirname(self.config_path), "api", self.target_api + ".json")
+            with open(api_file, encoding="utf-8") as stream:
+                if not isinstance(json.load(stream), dict):
+                    raise ValueError("API 配置必须是 JSON 对象")
+            update_config_atomic(self.config_path, {"API_LAST": self.target_api})
             self.finished_signal.emit(True, "", self.target_api)
         except Exception as e:
             self.finished_signal.emit(False, str(e), "")
@@ -72,19 +73,20 @@ class SaveApiWorker(QThread):
         self.payload = payload
     def run(self):
         try:
-            if self.old_name and self.old_name != self.new_name and self.old_name != "(空)":
-                old_path = os.path.join(self.api_dir, f"{self.old_name}.json")
+            validate_config_name(self.new_name)
+            validate_config_name(self.old_name)
+            old_path = os.path.join(self.api_dir, self.old_name + ".json")
+            file_path = os.path.join(self.api_dir, self.new_name + ".json")
+            renamed = os.path.normcase(old_path) != os.path.normcase(file_path)
+            if renamed and os.path.exists(file_path):
+                raise FileExistsError("已存在同名 API 配置，请使用其他名称。")
+            # Save the replacement before removing the old credentials.
+            save_config_atomic(self.payload, file_path)
+            if renamed:
+                if self.old_name == self.active_api_name:
+                    update_config_atomic(self.config_path, {"API_LAST": self.new_name})
                 if os.path.exists(old_path):
                     os.remove(old_path)
-                if self.old_name == self.active_api_name:
-                    try:
-                        with open(self.config_path, 'r', encoding='utf-8') as f: config = json.load(f)
-                        config["API_LAST"] = self.new_name
-                        save_config_atomic(config, self.config_path)
-                    except: pass
-            
-            file_path = os.path.join(self.api_dir, f"{self.new_name}.json")
-            save_config_atomic(self.payload, file_path)
             self.finished_signal.emit(True, "", self.new_name)
         except Exception as e:
             self.finished_signal.emit(False, str(e), "")
@@ -273,20 +275,21 @@ class ApiPage(QWidget):
         target = self.api_combo.currentText()
         if not target: return
         
-        # 🌟 修复隐患 2：直接更新单例内存，极速生效
-        bottom.global_config.set_active_api(target)
-        
         self.setEnabled(False)
         self.enable_api_btn.setText("✅ 正在启用...")
         
         self.enable_worker = EnableApiWorker(config_path, target)
         self.enable_worker.finished_signal.connect(self.on_api_enabled)
         self.enable_worker.finished.connect(self.enable_worker.deleteLater)
-        self.enable_worker.start()
+        start_worker(self.enable_worker)
 
     def on_api_enabled(self, success, error_msg, target):
+        if is_shutting_down():
+            return
         self.setEnabled(True)
         if success:
+            bottom.global_config.reload_api_config()
+            self.active_api_name = target
             QMessageBox.information(self, "启用成功", f"桌宠大脑已成功切换至引擎：【{target}】喵！")
             self.on_api_combo_changed(target)
         else:
@@ -314,9 +317,11 @@ class ApiPage(QWidget):
         self.create_worker = CreateApiWorker(api_dir, new_name, empty_payload)
         self.create_worker.finished_signal.connect(self.on_api_created)
         self.create_worker.finished.connect(self.create_worker.deleteLater)
-        self.create_worker.start()
+        start_worker(self.create_worker)
 
     def on_api_created(self, success, error_msg, new_name):
+        if is_shutting_down():
+            return
         self.setEnabled(True)
         self.new_api_btn.setText("➕ 新建配置")
         if success:
@@ -340,12 +345,15 @@ class ApiPage(QWidget):
                 self.delete_worker = DeleteApiWorker(file_path)
                 self.delete_worker.finished_signal.connect(self.on_api_deleted)
                 self.delete_worker.finished.connect(self.delete_worker.deleteLater)
-                self.delete_worker.start()
+                start_worker(self.delete_worker)
 
     def on_api_deleted(self, success, error_msg):
+        if is_shutting_down():
+            return
         self.setEnabled(True)
         self.del_api_btn.setText("🗑️ 删除该配置")
         if success:
+            bottom.global_config.reload_api_config()
             QMessageBox.information(self, "成功", "配置文件已化为齑粉喵！")
             self.refresh_api_combo()
         else:
@@ -358,7 +366,12 @@ class ApiPage(QWidget):
         if not new_name:
             QMessageBox.warning(self, "错误", "配置文件名不能为空喵！")
             return
-        if new_name.endswith(".json"): new_name = new_name[:-5]
+        if new_name.lower().endswith(".json"): new_name = new_name[:-5]
+        try:
+            validate_config_name(new_name)
+        except ValueError as exc:
+            QMessageBox.warning(self, "错误", str(exc))
+            return
             
         api_dir = os.path.join(current_dir, "api")
         
@@ -373,16 +386,16 @@ class ApiPage(QWidget):
         self.save_worker = SaveApiWorker(old_name, new_name, self.active_api_name, api_dir, config_path, payload)
         self.save_worker.finished_signal.connect(self.on_api_saved)
         self.save_worker.finished.connect(self.save_worker.deleteLater)
-        self.save_worker.start()
+        start_worker(self.save_worker)
 
     def on_api_saved(self, success, error_msg, new_name):
+        if is_shutting_down():
+            return
         self.setEnabled(True)
         self.save_api_btn.setText("📦 更改该 API 配置")
         
         if success:
-            if new_name == self.active_api_name:
-                # 🌟 核心修改：如果改的是当前正在用的 API，直接更新内存
-                bottom.global_config.set_active_api(new_name)
+            bottom.global_config.reload_api_config()
             QMessageBox.information(self, "保存成功", f"API 档案 [{new_name}] 已成功更改并入库喵！")
             self.refresh_api_combo(select_name=new_name)
         else:

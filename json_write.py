@@ -1,35 +1,57 @@
-# 文件名：json_write.py
-
-import os
+"""Atomic JSON writes and serialized read-modify-write updates."""
 import json
+import os
+import tempfile
+import threading
+
+_config_lock = threading.RLock()
+
 
 def save_config_atomic(config, file_path):
-    """
-    工业级原子化写入 JSON 配置文件
-    彻底杜绝断电、死机导致的文件损坏变 0 字节问题
-    """
-    dir_name = os.path.dirname(file_path)
-    os.makedirs(dir_name, exist_ok=True)
-    
-    # 1. 设定一个临时文件路径
-    temp_path = file_path + ".tmp"
-    
-    try:
-        # 2. 先把数据安安全全地写到临时文件里
-        with open(temp_path, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
-            
-            # 【核心防御】：强迫操作系统把缓冲区的数据立刻、马上刷入物理硬盘！
-            f.flush()
-            os.fsync(f.fileno()) 
-            
-        # 3. 数据安全落地后，执行原子级替换（瞬间用 .tmp 覆盖原文件）
-        # os.replace 在 Windows 和 Linux 上都是原子操作，极其安全
-        os.replace(temp_path, file_path)
-        
-    except Exception as e:
-        print(f"⚠️ 致命防御：写入配置文件失败，但原文件已保住！错误：{e}")
-        # 如果写入中途报错，清理掉那个可能损坏的临时文件，原文件安然无恙
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+    """Replace a JSON file only after writing it completely; propagate failures."""
+    file_path = os.path.abspath(file_path)
+    with _config_lock:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=os.path.dirname(file_path),
+                prefix="." + os.path.basename(file_path) + ".", suffix=".tmp", delete=False,
+            ) as stream:
+                temp_path = stream.name
+                json.dump(config, stream, indent=2, ensure_ascii=False)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp_path, file_path)
+        finally:
+            if temp_path is not None and os.path.exists(temp_path):
+                os.unlink(temp_path)
 
+
+def update_config_atomic(file_path, updates):
+    """Apply a mapping or callback without losing another thread's edits."""
+    with _config_lock:
+        config = {}
+        if os.path.exists(file_path):
+            with open(file_path, encoding="utf-8") as stream:
+                config = json.load(stream)
+        if not isinstance(config, dict):
+            raise ValueError("配置文件必须是 JSON 对象")
+        if callable(updates):
+            updates(config)
+        else:
+            config.update(updates)
+        save_config_atomic(config, file_path)
+        return config
+
+
+def validate_config_name(name):
+    """Require one portable Windows filename, never a path."""
+    import re
+    if (not name or name in {".", ".."} or name != name.rstrip(" .")
+            or re.search(r'[\\/:*?"<>|\x00-\x1f]', name)
+            or name.split(".")[0].upper() in
+            {"CON", "PRN", "AUX", "NUL", *{f"COM{i}" for i in range(1, 10)},
+             *{f"LPT{i}" for i in range(1, 10)}}):
+        raise ValueError("名称必须是有效的文件名，不能包含路径、保留名称或非法字符。")
+    return name

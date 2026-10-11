@@ -1,5 +1,7 @@
+from worker_lifecycle import start_worker, is_shutting_down
 # 文件名：version_check.py
 import json
+import re
 import os
 import sys
 import requests
@@ -7,12 +9,12 @@ import urllib3
 import webbrowser
 
 # 【新增】引入我们刚刚写好的原子化写入工具
-from json_write import save_config_atomic
+from json_write import save_config_atomic, update_config_atomic
 
 # ==========================================
 # 🌟 核心变化 1：引入 PySide6 相关组件
 # ==========================================
-from PySide6.QtCore import QThread, Signal, Qt
+from PySide6.QtCore import QThread, Signal, Qt, QObject, Slot
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QCheckBox, QPushButton, QHBoxLayout, QApplication
 from PySide6.QtGui import QIcon
 
@@ -28,6 +30,18 @@ def get_base_path():
 # 动态拼接出绝对安全的路径
 CONFIG_PATH = os.path.join(get_base_path(), 'asset', 'version.json')
 ICON_PATH = os.path.join(get_base_path(), 'asset', 'icon.ico')
+
+def version_key(value):
+    """Compare release versions numerically; a prerelease precedes the final release."""
+    if not isinstance(value, str):
+        return None
+    match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)(?:[-.]?(dev|alpha|a|beta|b|rc)[.-]?(\d+)?)?", value.strip(), re.I)
+    if not match:
+        return None
+    major, minor, patch, stage, number = match.groups()
+    rank = {"dev": 0, "a": 1, "alpha": 1, "b": 2, "beta": 2, "rc": 3, None: 4}
+    return (int(major), int(minor), int(patch), rank[stage.lower() if stage else None], int(number or 0))
+
 
 def load_config():
     if not os.path.exists(CONFIG_PATH):
@@ -110,8 +124,11 @@ class UpdateDialog(QDialog):
         """处理确认逻辑并关闭窗口"""
         if self.ignore_checkbox.isChecked():
             if self.cloud_version not in self.config.get("ignored_versions", []):
-                self.config["ignored_versions"].append(self.cloud_version)
-                save_config(self.config)
+                def ignore_version(config):
+                    ignored = config.setdefault("ignored_versions", [])
+                    if self.cloud_version not in ignored:
+                        ignored.append(self.cloud_version)
+                update_config_atomic(CONFIG_PATH, ignore_version)
         self.accept()
 
 # ==========================================
@@ -143,7 +160,9 @@ class VersionCheckThread(QThread):
                 )
                 response.raise_for_status() 
                 data = response.json()
-                return data.get("current_version")
+                value = data.get("current_version")
+                if version_key(value) is not None:
+                    return value
             except Exception:
                 num_str = zh_nums[i] if i < len(zh_nums) else str(i + 1)
                 print(f"节点{num_str}失败，尝试切换线路喵...")
@@ -153,35 +172,44 @@ class VersionCheckThread(QThread):
         return None
 
     def run(self):
-        cloud_version = self.fetch_latest_version()
-        if not cloud_version:
-            return
-            
-        config = load_config()
-        
-        if config.get("latest_version") != cloud_version:
-            config["latest_version"] = cloud_version
-            save_config(config)
-            
-        if cloud_version != config["current_version"]:
-            if cloud_version not in config.get("ignored_versions", []):
-                print(f"后台发现新版本：{cloud_version}，正在呼叫大堂经理...")
+        try:
+            cloud_version = self.fetch_latest_version()
+            if not cloud_version:
+                return
+            config = load_config()
+            current = version_key(config.get("current_version"))
+            latest = version_key(cloud_version)
+            if current is None or latest is None:
+                return
+            update_config_atomic(CONFIG_PATH, {"latest_version": cloud_version})
+            if latest > current and cloud_version not in config.get("ignored_versions", []):
                 self.update_found_signal.emit(cloud_version)
-            else:
-                print(f"版本 {cloud_version} 在忽略列表中，不弹窗。")
-        else:
-            print("当前已经是最新版本了，没有任何更新。")
+        except Exception as exc:
+            print(f"版本检查失败: {exc}")
 
 # ==========================================
 # 🌟 核心变化 4：对外提供启动接口
 # ==========================================
-_checker_thread = None 
+_checker_thread = None
+_controller = None
+
+
+class VersionController(QObject):
+    @Slot(str)
+    def show_update(self, version):
+        if not is_shutting_down():
+            UpdateDialog(version).exec()
+
 
 def start_version_check_async():
-    global _checker_thread
+    global _checker_thread, _controller
+    if is_shutting_down() or (_checker_thread is not None and _checker_thread.isRunning()):
+        return
+    if _controller is None:
+        _controller = VersionController(QApplication.instance())
     _checker_thread = VersionCheckThread()
-    _checker_thread.update_found_signal.connect(lambda v: UpdateDialog(v).exec())
-    _checker_thread.start()
+    _checker_thread.update_found_signal.connect(_controller.show_update, Qt.QueuedConnection)
+    start_worker(_checker_thread)
 
 if __name__ == "__main__":
     print("开始测试版本检查 (PySide6 信号槽版)...")

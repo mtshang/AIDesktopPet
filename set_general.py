@@ -1,10 +1,10 @@
 # 文件名：set_general.py
-import os, sys, json
+import os, sys, json, subprocess
 import winreg  # 【新增】用于操作 Windows 注册表
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QPushButton, QMessageBox
 
 # 【新增】引入工业级防损坏写入工具
-from json_write import save_config_atomic
+from json_write import update_config_atomic
 
 def get_base_path():
     if getattr(sys, 'frozen', False): 
@@ -132,20 +132,19 @@ class GeneralPage(QWidget):
         
         # 获取当前运行的程序路径 (适配打包后的 exe 或源码运行)
         if getattr(sys, 'frozen', False):
-            app_path = sys.executable
+            app_path = subprocess.list2cmdline([sys.executable])
         else:
-            app_path = os.path.abspath(sys.argv[0])
+            app_path = subprocess.list2cmdline([sys.executable, os.path.join(get_base_path(), "main.py")])
 
         try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
-            if enabled:
-                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, app_path)
-            else:
-                try:
-                    winreg.DeleteValue(key, app_name)
-                except FileNotFoundError:
-                    pass # 如果本来就没有，就不管它
-            winreg.CloseKey(key)
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE) as key:
+                if enabled:
+                    winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, app_path)
+                else:
+                    try:
+                        winreg.DeleteValue(key, app_name)
+                    except FileNotFoundError:
+                        pass
             return True
         except Exception as e:
             print(f"写入注册表失败: {e}")
@@ -153,23 +152,16 @@ class GeneralPage(QWidget):
 
     def save_general_settings(self):
         try:
-            config = {}
-            if os.path.exists(config_path):
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-            
             new_admin_state = self.admin_cb.isChecked()
             new_autostart_state = self.autostart_cb.isChecked()
 
             # 1. 处理注册表
             reg_success = self.set_windows_autostart(new_autostart_state)
             
-            # 2. 更新 config 数据
-            config["RUN_AS_ADMIN"] = new_admin_state
-            config["AUTO_START"] = new_autostart_state # 【新增】
-
-            # 3. 原子化写入
-            save_config_atomic(config, config_path)
+            updates = {"RUN_AS_ADMIN": new_admin_state}
+            if reg_success:
+                updates["AUTO_START"] = new_autostart_state
+            update_config_atomic(config_path, updates)
                 
             # 提示逻辑
             msg = "综合设置已保存喵！"
@@ -181,7 +173,8 @@ class GeneralPage(QWidget):
                 msg += "\n\n⚠️ 开机自启写入注册表失败，请检查杀毒软件是否拦截。"
             
             QMessageBox.information(self, "成功", msg)
-            self.original_autostart_state = new_autostart_state
+            if reg_success:
+                self.original_autostart_state = new_autostart_state
                 
         except Exception as e:
             QMessageBox.warning(self, "存档失败", f"写入配置失败：{e}")
